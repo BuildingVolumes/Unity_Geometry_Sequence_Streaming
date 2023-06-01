@@ -1,0 +1,5 @@
+build/
+dist/
+
+GeometrySequenceConverter.exe
+GeometrySequenceConverter.spec
