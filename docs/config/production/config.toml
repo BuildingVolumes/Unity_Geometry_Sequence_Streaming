@@ -1,1 +1,2 @@
-canonifyURLs = false
+canonifyURLs = true
+baseUrl = "https://elite-volumetric-capture-sqad.github.io/Unity_Geometry_Sequence_Streaming/"
