@@ -25,7 +25,7 @@ For playback scenarios, where a precise control of the playback, or cohesive ani
 
 2. Create a new empty gameobject, or select the one you want to attach the timeline to. ![Add a gameobject](timeline-newgo.png)
 
-3. Add a **"Geometry Sequence Stream"** component to the gameobject. 
+3. Add a **"Geometry Sequence Stream"** component to the gameobject.
     > ⚠️ Check that there is no "Geometry Sequence Player" component attached to the gameobject, when you use the Geometry Sequence Stream component for timeline playback!
 
     ![Add a Geometry Sequence Stream component](timeline_add_component.png)
@@ -45,4 +45,3 @@ For playback scenarios, where a precise control of the playback, or cohesive ani
 10. Done! The clip will only playback when you're in play mode, so if you want to see your sequence, you need to go into it first.
 
 11. You can now add more clips on the same track, or play two clips at the same time, by adding a **second Geometry Sequence Stream** component, and assigning it to a second track.
-

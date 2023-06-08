@@ -23,7 +23,7 @@ toc: true
 
 3. Download the converter binaries for windows here.
 
-4. Open the converter, and set the **input folder** to the folder containing your sequence. The **output folder** should be set to a different (empty) folder. Click on **Start Conversion**. 
+4. Open the converter, and set the **input folder** to the folder containing your sequence. The **output folder** should be set to a different (empty) folder. Click on **Start Conversion**.
 
     ![The converter](Converter_Start_Threads.png)
 
