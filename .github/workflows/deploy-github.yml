@@ -4,7 +4,6 @@ name: GitHub Pages
 
 on: workflow_dispatch
 
-
 jobs:
   deploy:
     runs-on: ubuntu-20.04
@@ -14,6 +13,7 @@ jobs:
         with:
           node-version: '16'
           cache: 'npm'
+          cache-dependency-path: './docs/package-lock.json'
 
       - name: Install dependencies
         working-directory: ./docs
@@ -28,7 +28,6 @@ jobs:
         run: npm run build
 
       - name: Deploy to GitHub Pages
-        working-directory: ./docs
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
