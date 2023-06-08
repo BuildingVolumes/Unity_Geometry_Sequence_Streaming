@@ -18,16 +18,20 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        working-directory: ./docs
         run: npm install
 
       - name: Check for linting errors
+        working-directory: ./docs
         run: npm test
 
       - name: Build production website
+        working-directory: ./docs
         run: npm run build
 
       - name: Deploy to GitHub Pages
+        working-directory: ./docs
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
+          publish_dir: ./docs/public
