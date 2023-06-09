@@ -10,10 +10,10 @@ description = "With this Unity plugin, you can easily stream large geometric fra
 # docsVersion = "1.0"
 
 ## Open Graph
-images = ["doks.png"]
+images = ["Unity_Package_OpenGraph_logo.png"]
 ogLocale = "en_US"
-domainTLD = "doks.netlify.app"
-titleHome = "Doks Theme"
+domainTLD = "volumes.sequencestreaming.docs"
+titleHome = "Unity Geometry Sequence Streaming"
 
 ## Twitter Cards
 twitterSite = ""
@@ -77,7 +77,7 @@ alertText = "Introducing the Doks child theme, several DX + UX updates, and more
 # repoHost [Github | Gitea | GitLab | Bitbucket | BitbucketServer ] is used for building the edit link based on git hoster
 repoHost = "GitHub"
 #repoHost = "Gitea"
-docsRepo = "https://github.com/h-enk/doks"
+docsRepo = "https://github.com/Elite-Volumetric-Capture-Sqad/Unity_Geometry_Sequence_Streaming"
 docsRepoBranch = "master"
 docsRepoSubPath = ""
 editPage = false
