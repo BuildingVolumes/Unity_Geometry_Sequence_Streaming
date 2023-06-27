@@ -4,8 +4,6 @@
 
 ### A package for Unity to stream large pointcloud and (textured) mesh sequences from disk
 
-🚧 Currently the repo/site is still under constructions, please check back in a few days!
-
 https://github.com/Elite-Volumetric-Capture-Sqad/Unity_Geometry_Sequence_Streaming/assets/39704202/c3e611dc-285f-4e22-b411-04c9e2cb2321
 
 [Credits](https://elite-volumetric-capture-sqad.github.io/Unity_Geometry_Sequence_Streaming/docs/about/license-credits/#credits)
