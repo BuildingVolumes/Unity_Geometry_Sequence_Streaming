@@ -19,4 +19,4 @@ toc: true
 
 👾 [Join us in our BuildingVolumes community discord server](https://discord.gg/BvQdJdJqu6)
 
-> ☝🏻 If you have an issue in the project, or you encounter any bugs, please don't contact us here, but instead [open an issue on Github!](docs/help/issues/)
+> ☝🏻 If you have an issue in the project, or you encounter any bugs, please don't contact us here, but instead [open an issue on Github!](/docs/help/issues/)
