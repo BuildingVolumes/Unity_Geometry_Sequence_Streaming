@@ -14,7 +14,8 @@ toc: true
 ---
 
 ### Version 1.0.0
-Initial Release, this plugin supersedes the Pointcloud Player Package: https://github.com/ExperimentalSurgery/Unity_Geometry_Sequence_Streaming
 
-Converter release: https://github.com/BuildingVolumes/Unity_Geometry_Sequence_Streaming/releases/tag/v1.0.0
-Package release: https://github.com/BuildingVolumes/Geometry_Sequence_Streaming_Package/releases/tag/v1.0.0
+Initial Release, this plugin supersedes the [Pointcloud Player Package](https://github.com/ExperimentalSurgery/Unity_Geometry_Sequence_Streaming)
+
+[Converter release v1.0.0](https://github.com/BuildingVolumes/Unity_Geometry_Sequence_Streaming/releases/tag/v1.0.0)
+[Package release v1.0.0](https://github.com/BuildingVolumes/Geometry_Sequence_Streaming_Package/releases/tag/v1.0.0)
