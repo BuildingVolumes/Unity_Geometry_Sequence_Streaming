@@ -21,7 +21,7 @@ toc: true
 
 2. In the Package Manager window, go into the upper left corner and click on the **"+" Button --> Add package from Git URL** ![Add package with git](package_manager_git.png)
 
-3. Copy and paste the following URL and click **Add**: `https://github.com/Elite-Volumetric-Capture-Sqad/Geometry_Sequence_Streaming_Package.git` ![Installing a package](package_manager_add.png)
+3. Copy and paste the following URL and click **Add**: `https://github.com/BuildingVolumes/Geometry_Sequence_Streaming_Package.git` ![Installing a package](package_manager_add.png)
 
 4. Unity now installs the package, and after a short time it should show up in your manager. Done! We strongly recommend that you also install the **Samples 👇🏻**
 

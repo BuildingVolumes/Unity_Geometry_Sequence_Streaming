@@ -64,7 +64,7 @@ And for images:
 
 ### Installing the converter
 
-1. Download the latest version of the converter tool from here: Download. Currently only windows is supported
+1. Download the latest version of the [converter tool from here](https://github.com/BuildingVolumes/Unity_Geometry_Sequence_Streaming/releases). (File named "Geometry_Sequence_Converter_Win64.zip") Currently only windows is supported.
 2. Unpack the file
 3. Open the converter. Go into the unpacked folder and open "GeometrySequenceConverter.exe". Windows might throw a warning that it prevented the app from running, in this case click on "Run anyway" or "More info" and then "Run anyway".
 

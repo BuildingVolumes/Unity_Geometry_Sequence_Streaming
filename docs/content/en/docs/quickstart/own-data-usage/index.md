@@ -21,9 +21,9 @@ toc: true
 
 2. Almost all commonly used pointcloud/mesh (.fbx .obj .gltf .ply .xzy) and image (.dds .jpeg .png .tga) formats can be used as source material. Ensure that your sequence is in such a format
 
-3. Download the converter binaries for windows here.
+3. Download the latest converter [binaries for windows here](https://github.com/BuildingVolumes/Unity_Geometry_Sequence_Streaming/releases) (The file named Geometry_Sequence_Converter_Win64.zip)
 
-4. Open the converter, and set the **input folder** to the folder containing your sequence. The **output folder** should be set to a different (empty) folder. Click on **Start Conversion**.
+4. Unzip, open the converter, and set the **input folder** to the folder containing your sequence. The **output folder** should be set to a different (empty) folder. Click on **Start Conversion**.
 
     ![The converter](Converter_Start_Threads.png)
 

@@ -13,6 +13,6 @@ weight: 610
 toc: true
 ---
 
-#### 🪲 If you have any issues, are stuck, or experience errors, please report them [here in the main Github repository](https://github.com/Elite-Volumetric-Capture-Sqad/Unity_Geometry_Sequence_Streaming/issues) 🪲
+#### 🪲 If you have any issues, are stuck, or experience errors, please report them [here in the main Github repository](https://github.com/BuildingVolumes/Unity_Geometry_Sequence_Streaming/issues) 🪲
 
 >💡 Do a quick search first, if your issue has already been reported. If not, please open a new one, and we'll get back to you!

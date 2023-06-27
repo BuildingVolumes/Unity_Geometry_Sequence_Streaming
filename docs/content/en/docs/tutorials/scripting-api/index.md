@@ -23,10 +23,10 @@ Beside playback from timeline and in the editor, this package also allows you to
 
 To use the Scripting API, you need to have a gameobject in the scene that has the **Geometry Sequence Player** and **Geometry Sequence Stream** components attached to it.
 
-First, include the GeometrySequence namespace inside your script with:
+First, include the BuildingVolumes namespace inside your script with:
 
 ```C#
-using GeometrySequence.Streaming;
+using BuildingVolumes.Streaming;
 ```
 
 In your script, you then have to get the **Geometry Sequence Player** component, ideally directly in the start function:

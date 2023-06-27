@@ -19,7 +19,7 @@ toc: true
 
 2. In the **Package Manager window**, go into the upper left corner and click on the **"+" Button –> Add package from Git URL.**
 
-3. Copy and paste the following URL into the field and click **Add**: `https://github.com/Elite-Volumetric-Capture-Sqad/Geometry_Sequence_Streaming_Package.git`
+3. Copy and paste the following URL into the field and click **Add**: `https://github.com/BuildingVolumes/Geometry_Sequence_Streaming_Package.git`
 
 4. To install the samples, select the Geometry Streaming Sequence package and open the **Sample foldout**. Then click on **Import**.
 
