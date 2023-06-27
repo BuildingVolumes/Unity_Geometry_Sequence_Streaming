@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://elite-volumetric-capture-sqad.github.io/Unity_Geometry_Sequence_Streaming/sitemap.xml
+Sitemap: https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/sitemap.xml
