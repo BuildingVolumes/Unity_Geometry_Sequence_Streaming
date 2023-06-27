@@ -26,8 +26,8 @@ Usecases are for example: Simulations (physics, fluids), animated meshes with ch
 
 ## Install & Usage:
 
-[Please see the documentation](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/)
+[Please see the documentation website](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/)
 
 ## License:
 
-Licensed under the [MIT License](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/)
+Licensed under the [MIT License](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/docs/about/license-credits/#mit-license)
