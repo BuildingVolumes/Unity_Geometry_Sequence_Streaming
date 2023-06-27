@@ -6,7 +6,7 @@
 
 https://github.com/Elite-Volumetric-Capture-Sqad/Unity_Geometry_Sequence_Streaming/assets/39704202/c3e611dc-285f-4e22-b411-04c9e2cb2321
 
-[Credits](https://elite-volumetric-capture-sqad.github.io/Unity_Geometry_Sequence_Streaming/docs/about/license-credits/#credits)
+[Credits](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/docs/about/license-credits/)
 
 ## Overview:
 
@@ -14,7 +14,7 @@ This package allows you to stream large and heavy geometric frame sequences (whe
 The package was orginally developed to allow playback of Volumetric Video captures, but can also be used to play any animated 3D-sequences, that are unsuitable for bone or blendshape workflows.
 Usecases are for example: Simulations (physics, fluids), animated meshes with changing topology and animated pointclouds.
 
-[**Quickstart**](https://elite-volumetric-capture-sqad.github.io/Unity_Geometry_Sequence_Streaming/docs/quickstart/quick-start/)
+[**Quickstart**](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/docs/quickstart/quick-start/)
 
 
 ## Features
@@ -26,8 +26,8 @@ Usecases are for example: Simulations (physics, fluids), animated meshes with ch
 
 ## Install & Usage:
 
-[Please see the documentation](https://elite-volumetric-capture-sqad.github.io/Unity_Geometry_Sequence_Streaming/)
+[Please see the documentation](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/)
 
 ## License:
 
-Licensed under the [MIT License](https://github.com/Elite-Volumetric-Capture-Sqad/Unity_Geometry_Sequence_Streaming/blob/main/LICENSE)
+Licensed under the [MIT License](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/)
