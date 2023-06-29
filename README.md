@@ -28,6 +28,12 @@ Usecases are for example: Simulations (physics, fluids), animated meshes with ch
 
 [Please see the documentation website](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/)
 
+[Unity Forums Thread](https://forum.unity.com/threads/released-geometry-sequence-streaming.1453765/)
+
 ## License:
 
 Licensed under the [MIT License](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/docs/about/license-credits/#mit-license)
+
+## Thanks to:
+
+Charite Experimental Surgery lab, for supporting much of the development: [Website](https://www.experimental-surgery.de/) | [Github](https://github.com/ExperimentalSurgery)
