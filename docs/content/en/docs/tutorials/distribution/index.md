@@ -45,6 +45,6 @@ On Android, the StreamingAssets path is a special case. Data stored into this pa
 3. Connect your device to your PC via USB, enable File transfer and then go to the following path on the device:
 *"\Android\data\com.myCompanyName.myProductName\files"*. This is your applications **Persistent Data Path**.
 
-4. Copy your sequence files in the same relative path you set in the Geometry Sequence Player.
+4. Copy your sequence files in the same relative path you set in the Geometry Sequence Player. In our example, the geometry files would be copied into this folder *"\Android\data\com.myCompanyName.myProductName\files\Sequence\MySequence"*
 
 5. Now run your app again, you should now see the sequence streaming successfully.
