@@ -31,9 +31,10 @@ In Unity, the best way is to create a [**Streamingassets**](https://docs.unity3d
 4. Test your changes and path in playmode, then you can build and distribute your application as usual.
 
 ## Android
+
 On Android, the StreamingAssets path is a special case. Data stored into this path, will be compressed into the .apk and needs to be decompressed on load. For large files, like geometry sequences, this will make a noticable impact on playback performance, therefore the Streamingassets path is not supported. On Android, you have to use the applications [**Persistent Data Path**](https://docs.unity3d.com/ScriptReference/Application-persistentDataPath.html). The persistent data path is a special path, which stores data spefically for the appliaction. However Unity won't copy the files automatically on build, you have to **copy them manually**.
 
-> ⚠️The persistent data path will only be generated on the applications first run on the device. So you need to run the application once, then copy the files and then run the application again, or download the files onto the device before the Geometry Sequence Player runs. 
+> ⚠️The persistent data path will only be generated on the applications first run on the device. So you need to run the application once, then copy the files and then run the application again, or download the files onto the device before the Geometry Sequence Player runs.
 
 1. Inside of your Geometry Sequence Player, set the **Path Relation** to **Relative to Persisten Data Path** and enter the relative path in which you later want to store your sequence, in this example we choose *"Sequence/MySequence"*.
 
