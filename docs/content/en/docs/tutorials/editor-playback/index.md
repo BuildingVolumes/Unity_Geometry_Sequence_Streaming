@@ -27,7 +27,7 @@ After you've prepared and converted your sequence, you can now stream them from 
 2. In the inspector, click on **"Add Component"**, search for **"Geometry Sequence Player"** and add this component.  ![Add component](editor_playback_add_component.png)
 
 3. You should now see a Geometry Sequence Player and Geometry Sequence Stream component attached to your gameobject. Click on **"Open Sequence"** in the Player script, and then open the folder, in which your converted sequence is stored.
-    > ⚠️ When you're just trying out playback on your machine, or you don't intent to distribute your app to other PCs, it's fine to store the sequence anywhere on disk. However, if you plan to distribute your application, you need to put your sequence into the [Streaming Assets folder](https://docs.unity3d.com/Manual/StreamingAssets.html)!
+    > ⚠️ When you're just trying out playback on your machine, or you don't intent to distribute your app to other PCs, it's fine to store the sequence anywhere on disk. However, if you plan to distribute your application, [please take a look here](/docs/tutorials/distribution)!
   
     ![Open Sequence](editor_playback_open_sequence.png)
 
