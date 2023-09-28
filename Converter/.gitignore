@@ -1,5 +1,7 @@
 build/
 dist/
+resources/config.ini
 
+Geometry_Sequence_Converter_Win64.zip
 GeometrySequenceConverter.exe
 GeometrySequenceConverter.spec
