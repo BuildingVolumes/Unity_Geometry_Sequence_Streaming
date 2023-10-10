@@ -47,47 +47,59 @@ Detailed explanation of all the settings and controls inside of the player and s
 
 ![All player settings](editor_playback_player_component.png)
 
-**Path relation**
+#### Path relation
+
 Choose if your path to the sequence is relative to the [Data path](https://docs.unity3d.com/ScriptReference/Application-dataPath.html), [Streaming Assets path](https://docs.unity3d.com/Manual/StreamingAssets.html) or is an absolute path. This gets set automatically if you open a sequence with the **Open Sequence** button. If you enter the path yourself, you also need to set this field!
 
-**Path to sequence**
+#### Path to sequence
+
 Enter your relative or absolute path to the folder containing the sequence
 
-**Open Sequence / Clear Sequence**
+#### Open Sequence / Clear Sequence
+
 Use the file explorer to choose the folder where your converted sequence is located, or clear the path from the player.
 
-**Target Playback FPS**
+#### Target Playback FPS
+
 This is the framerate at which you want to playback your sequence. It's important that this is set to the same framerate that you used while animating/capturing your sequence, as it also effects playback speed. E.g. if you exported your sequence at 30 FPS, but set the playback framerate to 60 FPS, the sequence will play twice as fast.
 
-**Play at Start**
+#### Play at Start
+
 Should the playback of the sequence start directly when the scene is started/you entered play mode?
 
-**Loop playback**
+#### Loop playback
+
 If activated, repeats the animation indefinitly
 
-**Actual FPS / Frame drop**
+#### Actual FPS / Frame drop
+
 This is the actual framerate at which the sequence plays back. If you either see a framerate lower than your target playback FPS, or see lot's of "Frame Dropped!" warning messages, this means that your system doesn't have enough resources to playback the sequence at it's intendet speed. You can either reduce the geometric complexity of your sequence, reduce the texture size, or upgrade your system.
 
-**Time slider**
+#### Time slider
+
 Use this slider to skip to any time in the sequence, just like in a regular video player. On the right, you can see at which frame the playback is right now, and how many frames there are in total in the sequence. The slider is only available in the editor.
 
-**Playback controls**
+#### Playback controls
+
 Use the **|<** Button to go back to the start of the sequence, the **<<** and **>>** to scroll forwards/backwards for a few frames, and the **Play/Pause** button to pause/resume the playback. These buttons are only available in the editor.
 
 ### Stream component
 
 ![All player settings](editor_playback_stream_component.png)
 
-**Parent Transform**
+#### Parent Transform
+
 You can attach the streamed mesh onto a parent gameobject, which you can use to place, scale, and rotate your streamed mesh.
 
-**Pointcloud Material**
+#### Pointcloud Material
+
 Set an alternative material that is used for displaying pointclouds. If left empty, the supplied default material will be used. Please note that pointclouds **cannot use standard Unity Materials/Shaders!** You need to use a special Pointcloud shader, like the one provided in the package.
 
-**Mesh material**
+#### Mesh material
+
 Set an alternative material that is used for displaying pointclouds. If left empty, the supplied default material will be used.
 
-**Buffer options:**
+#### Buffer options
 
 - **Buffer size**
 This size sets how many frames the streaming service will load from disk and store in a buffer in advance of the playback. A larger buffer might provide a smoother playback, however it also uses more memory and skipping/restarting playback might take longer, as the buffer needs to be flushed.
