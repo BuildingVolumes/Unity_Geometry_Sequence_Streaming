@@ -68,6 +68,8 @@ For more functions and precise playback control, please take a look below ðŸ‘‡ðŸ
 
 ## Scripting Reference
 
+### LoadSequence
+
 `LoadSequence(string path, PathType relativeTo, float playbackFPS , (optional) bool autoplay)`
 Load a .ply sequence (and optionally textures) from the path, and start playback if autoplay is enabled.
 Parameters:
@@ -81,11 +83,38 @@ Returns:
 
 - **True** when sequence could successfully be loaded, **false** when an error has occured while loading. Take a look in the Unity console in this case
 
+### SetPath
+
+`SetPath(string path, PathType relativeTo)`
+Set a new path in the player, but don't load the sequence. Use `ReloadSequence()` to actually load it, or LoadSequence() to do both at once.
+Parameters:
+
+- `path`: The relative or absolute path to the folder containing the directory. Should end with a slash
+- `relativeTo`: Is the path relative to the [data path](https://docs.unity3d.com/ScriptReference/Application-dataPath.htmls), [streaming assets path](https://docs.unity3d.com/Manual/StreamingAssets.html), or is it an absolute path?
+
+### ReloadSequence
+
+`ReloadSequence((optional) bool autoplay)`
+(Re)Loads the sequence which is currently set in the player, optionally starts playback.
+Parameters:
+
+- `autoplay` : Optional parameter, if set to true, playback starts directly after it has been loaded
+
+Returns:
+
+- **True** when sequence could successfully be reloaded, **false** when an error has occured while loading. Take a look in the Unity console in this case
+
+### Play
+
 `void Play()`
 Start Playback from the current location.
 
+### Pause
+
 `void Pause()`
 Pause current playback
+
+### SetLoopPlay
 
 `void SetLoopPlay(bool enabled)`
 Activate or deactivate looped playback
@@ -93,17 +122,23 @@ Parameters:
 
 - `enabled` : Set to true/false to enable/disable looped playback
 
+### SetAutoStart
+
 `void SetAutoStart(bool enabled)`
 Activate or deactivate automatic playback (when the scene starts)
 Parameters:
 
 - `enabled` : Set to true/false to enable/disable automatic playback when the scene has started
 
+### PlayFromStart
+
 `bool PlayFromStart()`
 Seeks to the start of the sequence and then starts playback
 Returns:
 
 - `True`, when the sequence could be started from the beginning `False` when there has been an error.
+
+### GoToFrame
 
 `bool GoToFrame(int frame)`
 Goes to a specific frame. Use GetTotalFrames() to check how many frames the clip contains
@@ -115,11 +150,15 @@ Returns:
 
 - `True` when skipping was successfull `False` if there has been an error, or the desired frame index was out of range
 
+### GoToTime
+
 `void GoToTime(float timeInSeconds)`
 Goes to a specific time in  a clip. The time is dependent on the framerate e.g. the same clip at 30 FPS is twice as long as at 60 FPS.
 Parameters:
 
 - `timeInSeconds` : The desired timestamp of the sequence to which you want to jump.
+
+### GetSequencePath
 
 `string GetSequencePath()`
 Gets the absolute path to the folder containing the sequence
@@ -127,11 +166,15 @@ Returns:
 
 - The absolute path to the Sequence currently used
 
+### IsPlaying
+
 `bool IsPlaying()`
 Is the current clip playing?
 Returns:
 
 - `True` if the clip is playing `False` if it is paused, stopped or not loaded
+
+### GetLoopingEnabled
 
 `bool GetLoopingEnabled()`
 Is looped playback enabled?
@@ -139,11 +182,15 @@ Returns:
 
 - `True` if the playback is enabled `False` if it is disabled
 
+### GetCurrentFrameIndex
+
 `int GetCurrentFrameIndex()`
 At which frame is the playback currently?
 Returns:
 
 - The frame index which is currently being played/shown
+
+### GetCurrentTime
 
 `float GetCurrentTime()`
 At which time is the playback currently in seconds?
@@ -152,11 +199,15 @@ Returns:
 
 - The current timestamp of the clip in seconds
 
+### GetTotalFrames
+
 `int GetTotalFrames()`
 How many frames are there in total in the whole sequence?
 Returns:
 
 - The total number of frames in the sequence
+
+### GetTotalTime
 
 `float GetTotalTime()`
 How long is the sequence in total?
@@ -165,6 +216,8 @@ Returns:
 
 - The length of the sequence in seconds
 
+### GetTargetFPS
+
 `float GetTargetFPS()`
 The target fps is the framerate we _want_ to achieve in playback. However, this is not guranteed, if system resources
 are too low. Use GetActualFPS() to see if you actually achieve this framerate
@@ -172,12 +225,16 @@ Returns:
 
 - The playback framerate used currently for this clip
 
+### GetActualFPS
+
 `float GetActualFPS()`
 What is the actual current playback framerate? If the framerate is much lower than the target framerate,
 consider reducing the complexity of your sequence, and don't forget to disable any V-Sync (VSync, FreeSync, GSync) methods!
 Returns:
 
 - The actual FPS at which your sequence is playing.
+
+### GetFrameDropped
 
 `bool GetFrameDropped()`
 Check if there have been framedrops since you last checked this function. You should pull this data every frame.
