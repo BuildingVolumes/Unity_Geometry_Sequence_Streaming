@@ -9,13 +9,13 @@ EditorBuildSettings:
     path: Assets/Samples/Geometry Sequence Streaming/1.0.0/Streaming Samples/01_Basic_Example.unity
     guid: c2693ea002a2e294980fc1acde74c2e9
   - enabled: 1
-    path: Assets/Samples/Geometry Sequence Streaming/1.0.3/Streaming Samples/01_Basic_Example.unity
+    path: Assets/Samples/Geometry Sequence Streaming/1.0.2/Streaming Samples/01_Basic_Example.unity
     guid: 44825002c4e225a47a7a5a3abd2939d3
   - enabled: 1
-    path: Assets/Samples/Geometry Sequence Streaming/1.0.3/Streaming Samples/02_Timeline_Example.unity
+    path: Assets/Samples/Geometry Sequence Streaming/1.0.2/Streaming Samples/02_Timeline_Example.unity
     guid: 3c915f6fa3c57224aaf485b9d354e160
   - enabled: 1
-    path: Assets/Samples/Geometry Sequence Streaming/1.0.3/Streaming Samples/03_API_Example.unity
+    path: Assets/Samples/Geometry Sequence Streaming/1.0.2/Streaming Samples/03_API_Example.unity
     guid: 758d4d1b6ca100b448e3966ac27cb599
   - enabled: 1
     path: Assets/EmptyScene.unity
