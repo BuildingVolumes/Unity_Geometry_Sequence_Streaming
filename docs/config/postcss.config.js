@@ -1,40 +1,64 @@
-const autoprefixer = require('autoprefixer');
-const purgecss = require('@fullhuman/postcss-purgecss');
-const whitelister = require('purgecss-whitelister');
+const autoprefixer = require("autoprefixer");
+const purgecss = require("@fullhuman/postcss-purgecss");
+const whitelister = require("purgecss-whitelister");
 
 module.exports = {
   plugins: [
     autoprefixer(),
     purgecss({
-      content: [
-        './node_modules/@hyas/doks/layouts/**/*.html',
-        './node_modules/@hyas/doks/content/**/*.md',
-        './layouts/**/*.html',
-        './content/**/*.md',
+      content: ["./hugo_stats.json"],
+      extractors: [
+        {
+          extractor: (content) => {
+            const els = JSON.parse(content).htmlElements;
+            return els.tags.concat(els.classes, els.ids);
+          },
+          extensions: ["json"]
+        }
+      ],
+      dynamicAttributes: [
+        "aria-expanded",
+        "data-bs-popper",
+        "data-bs-target",
+        "data-bs-theme",
+        "data-dark-mode",
+        "data-global-alert",
+        "data-pane", // tabs.js
+        "data-popper-placement",
+        "data-sizes",
+        "data-toggle-tab", // tabs.js
+        "id",
+        "size",
+        "type"
       ],
       safelist: [
-        'lazyloaded',
-        'table',
-        'thead',
-        'tbody',
-        'tr',
-        'th',
-        'td',
-        'h5',
-        'alert-link',
-        'container-xxl',
-        'container-fluid',
-        ...whitelister([
-          './node_modules/@hyas/doks/assets/scss/common/_variables.scss',
-          './node_modules/@hyas/doks/assets/scss/components/_alerts.scss',
-          './node_modules/@hyas/doks/assets/scss/components/_buttons.scss',
-          './node_modules/@hyas/doks/assets/scss/components/_code.scss',
-          './node_modules/@hyas/doks/assets/scss/components/_syntax.scss',
-          './node_modules/@hyas/doks/assets/scss/components/_search.scss',
-          './node_modules/@hyas/doks/assets/scss/common/_dark.scss',
-          './node_modules/katex/dist/katex.css',
-        ]),
-      ],
-    }),
-  ],
-}
+        "active",
+        "btn-clipboard", // clipboards.js
+        "clipboard", // clipboards.js
+        "disabled",
+        "code",
+        "hidden",
+        "modal-backdrop", // search-modal.js
+        "selected", // search-modal.js
+        "show",
+        "img-fluid",
+        "blur-up",
+        "lazyload",
+        "lazyloaded",
+        "alert-link",
+        "container-fw ",
+        "container-lg",
+        "container-fluid",
+        "offcanvas-backdrop",
+        "figcaption",
+        "dt",
+        "dd",
+        "showing",
+        "hiding",
+        "page-item",
+        "page-link",
+        ...whitelister(["./assets/scss/**/*.scss", "./node_modules/@hyas/doks-core/assets/scss/components/_code.scss", "./node_modules/@hyas/doks-core/assets/scss/components/_expressive-code.scss", "./node_modules/@hyas/doks-core/assets/scss/common/_syntax.scss"])
+      ]
+    })
+  ]
+};

@@ -7,7 +7,7 @@
   url = "/docs/quickstart/quick-start"
 
 [[main]]
-  name = "Docs"
+  name = "Documentation"
   url = "/docs/tutorials/tutorial"
   identifier = "docs"
   weight = 20
@@ -23,7 +23,7 @@
   name = "Tutorials"
   weight = 50
   identifier = "tutorials-menu"
-  url = "docs/tutorials/editor-playback"
+  url = "docs/tutorials/basic-playback"
   parent = "docs"
 
 [[main]]
@@ -37,7 +37,7 @@
   name = "Help"
   weight = 70
   identifier = "help-menu"
-  url = "docs/help/issues"
+  url = "docs/help/issues-and-bugs"
   parent = "docs"
 
 # Documentation Sections
