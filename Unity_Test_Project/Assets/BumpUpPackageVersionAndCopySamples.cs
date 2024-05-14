@@ -15,7 +15,10 @@ using System.Linq;
 
 public class BumpUpPackageVersionAndCopySamples : EditorWindow
 {
-    string pathToPackage = "C:\\Dev\\Volcapture\\Unity_Geometry_Sequence_Streaming\\Unity_Geometry_Sequence_Streaming\\Geometry_Sequence_Streaming_Package";
+    string pathToPackage = "C:\\Users\\Christopher\\Desktop\\Volcapture\\Visualization\\Unity_Geometry_Sequence_Streaming\\Geometry_Sequence_Streaming_Package";
+    string pathToSamplesRootFolder = "Assets\\Samples\\Geometry Sequence Streaming\\";
+    string pathToSamplesFolder = "";
+    string pathToNewSamplesFolder = "";
 
     string pathToPackageJSON = "";
     string pathToSamplesPackageFolder = "";
@@ -26,7 +29,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
     int newMinor;
     int newPatch;
 
-    [MenuItem("UGGS Package/Increment package version")]
+    [MenuItem("UGGS Package/Increment package version and copy samples")]
     static void Init()
     {
         BumpUpPackageVersionAndCopySamples window = GetWindow<BumpUpPackageVersionAndCopySamples>();
@@ -54,6 +57,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
     void OnGUI()
     {
+        GUILayout.Space(20);
         EditorGUILayout.LabelField("Current package version is: " + currentVersion, EditorStyles.wordWrappedLabel);
         GUILayout.Space(20);
         EditorGUILayout.LabelField("Change version to:", EditorStyles.wordWrappedLabel);
@@ -65,10 +69,21 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
         string newVersion = newMajor + "." + newMinor + "." + newPatch;
 
-        if (GUILayout.Button("Change Version"))
+        pathToSamplesFolder = pathToSamplesRootFolder + currentVersion + "\\Streaming Samples\\";
+        pathToNewSamplesFolder = pathToSamplesRootFolder + newVersion + "\\Streaming Samples\\";
+
+        if (GUILayout.Button("Change Version and copy samples"))
         {
             UpdatePackageJSONAndSave(pathToPackageJSON, packageJSONContent, newVersion);
             UpdateSamples(currentVersion, newVersion);
+            CopySamples(pathToNewSamplesFolder, pathToSamplesPackageFolder);
+            GetCurrentPackageVersion();
+            EditorUtility.SetDirty(this);
+        }
+
+        if (GUILayout.Button("Just copy samples"))
+        {
+            CopySamples(pathToNewSamplesFolder, pathToSamplesPackageFolder);
             GetCurrentPackageVersion();
             EditorUtility.SetDirty(this);
         }
@@ -115,14 +130,9 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
     void UpdateSamples(string currentVersion, string newVersion)
     {
-
-        string pathToSamplesRootFolder = "Assets\\Samples\\Geometry Sequence Streaming\\";
-        string pathToSamplesFolder = pathToSamplesRootFolder + currentVersion + "\\Streaming Samples\\";
-        string pathToNewSamplesFolder = pathToSamplesRootFolder + newVersion + "\\Streaming Samples\\";
         string pathToScene1 = pathToSamplesFolder + "01_Basic_Example.unity";
         string pathToScene2 = pathToSamplesFolder + "02_Timeline_Example.unity";
         string pathToScene3 = pathToSamplesFolder + "03_API_Example.unity";
-        string emptyScene = "Assets\\EmptyScene.unity";
 
         string pathToNewSampleData = "Samples\\Geometry Sequence Streaming\\" + newVersion + "\\Streaming Samples\\ExampleData\\Twisty_Box";
 
@@ -130,8 +140,6 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
         UpdateSample2(pathToScene2, pathToNewSampleData);
         UpdateSample3(pathToScene3, pathToNewSampleData);
         RenameSamplePath(pathToSamplesRootFolder + currentVersion, pathToSamplesRootFolder + newVersion);
-        EditorSceneManager.OpenScene(emptyScene, OpenSceneMode.Single);
-        CopySamples(pathToNewSamplesFolder, pathToSamplesPackageFolder);
     }
 
     bool UpdateSample1(string pathToScene, string pathToNewSampleData)
@@ -258,7 +266,10 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
     void CopySamples(string pathToAssetSamples, string pathToPackageSampleFolder)
     {
-        if(!Directory.Exists(pathToAssetSamples) || !Directory.Exists(pathToPackageSampleFolder))
+        string emptyScene = "Assets\\EmptyScene.unity";
+        EditorSceneManager.OpenScene(emptyScene, OpenSceneMode.Single);
+
+        if (!Directory.Exists(pathToAssetSamples) || !Directory.Exists(pathToPackageSampleFolder))
         {
             Debug.LogError("Could not find " + pathToAssetSamples + " or " + pathToPackageSampleFolder);
             return;
