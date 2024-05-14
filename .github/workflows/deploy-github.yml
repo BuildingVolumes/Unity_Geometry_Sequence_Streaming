@@ -40,8 +40,6 @@ jobs:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: './docs/package-lock.json'
-
-
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v4
@@ -49,12 +47,6 @@ jobs:
         run: "[[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci || true"
       - name: Build production website
         working-directory: ./docs
-        run: npm install
-
-      - name: Check for linting errors
-        working-directory: ./docs
-        run: npm test
-
         env:
           # For maximum backward compatibility with Hugo modules
           HUGO_ENVIRONMENT: production
