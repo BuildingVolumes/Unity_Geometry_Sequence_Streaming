@@ -1,5 +1,5 @@
 title = "Unity Geometry Sequence Streamer"
-baseurl = "https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/"
+baseurl = "https://localhost/"
 canonifyURLs = false
 disableAliases = true
 disableHugoGeneratorInject = true
