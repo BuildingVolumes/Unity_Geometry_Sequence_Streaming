@@ -44,6 +44,7 @@ jobs:
         id: pages
         uses: actions/configure-pages@v4
       - name: Install dependencies
+        working-directory: ./docs
         run: "[[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci || true"
       - name: Build production website
         working-directory: ./docs
@@ -60,7 +61,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: ./public
+          path: ./docs/public
 
   # Deployment job
   deploy:
