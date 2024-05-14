@@ -1,1 +1,2 @@
+canonifyURLs = false
 baseUrl = "https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/"
