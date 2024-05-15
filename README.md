@@ -26,7 +26,7 @@ Usecases are for example: Simulations (physics, fluids), animated meshes with ch
 
 ## Install & Usage:
 
-[Please see the documentation website](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/)
+[Please see the documentation website](https://buildingvolumes.github.io/Unity_Geometry_Sequence_Streaming/docs/quickstart/quick-start/)
 
 [Unity Forums Thread](https://forum.unity.com/threads/released-geometry-sequence-streaming.1453765/)
 
