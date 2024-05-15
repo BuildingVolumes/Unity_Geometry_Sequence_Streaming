@@ -13,7 +13,7 @@ weight: 430
 toc: true
 ---
 
-The Unity package, the Converter tool, the example data and this website is licensed under the ***MIT License***
+The Unity package, the Converter tool, the example data and this website is licensed under the ***MIT License.***
 **If you use this package in your project, we'd be grateful if you would credit us in your project**
 
 ## MIT License
