@@ -23,7 +23,7 @@ toc: true
 
 4. To install the samples, select the Geometry Streaming Sequence package and open the **Sample foldout**. Then click on **Import**.
 
-[More info](/docs/tutorials/installation/)
+[More info](/Unity_Geometry_Sequence_Streaming/docs/tutorials/installation/)
 
 ## Play your first sequence
 
@@ -33,4 +33,4 @@ toc: true
 
 ![A spinning box](https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNDMwZTkyOTEzZjRiM2M5ZWI4ZTc1NmEyNjIzZjg2OTU4MzRlZGQ0NCZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/cxJpQmE5QeReOgx16L/giphy.gif)
 
-[More info](/docs/tutorials/editor-playback/)
+[More info](/Unity_Geometry_Sequence_Streaming/docs/tutorials/editor-playback/)

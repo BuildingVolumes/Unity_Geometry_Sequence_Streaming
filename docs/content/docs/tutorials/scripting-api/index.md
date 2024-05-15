@@ -13,7 +13,7 @@ weight: 150
 toc: true
 ---
 
-> 💡 All of the features explained here in this tutorial can also be found in the Sample Scene [03_API_Example](/docs/tutorials/unity-package-installation/#importing-the-samples-optional)
+> 💡 All of the features explained here in this tutorial can also be found in the Sample Scene [03_API_Example](/Unity_Geometry_Sequence_Streaming/docs/tutorials/unity-package-installation/#importing-the-samples-optional)
 
 ## Intro
 
@@ -64,7 +64,7 @@ You can the load your sequence with the **OpenSequence()** function at any point
 player.OpenSequence("C:\MySequences\MyOwnSequence\", GeometrySequencePlayer.PathType.AbsolutePath, 30, true);
 ```
 
-👉 For an overview about the API Features, take a look at the [Scripting Reference](/docs/tutorials/scripting-api/#scripting-reference)
+👉 For an overview about the API Features, take a look at the [Scripting Reference](/Unity_Geometry_Sequence_Streaming/docs/tutorials/scripting-api/#scripting-reference)
 
 ## Events
 

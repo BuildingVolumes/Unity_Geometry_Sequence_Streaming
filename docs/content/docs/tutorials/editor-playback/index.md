@@ -16,7 +16,7 @@ toc: true
 
 ## Intro
 
-> 💡 All of the features explained here in this tutorial can also be found in the Sample Scene [01_Basic_Example](/docs/tutorials/unity-package-installation/#importing-the-samples-optional)
+> 💡 All of the features explained here in this tutorial can also be found in the Sample Scene [01_Basic_Example](/Unity_Geometry_Sequence_Streaming/docs/tutorials/unity-package-installation/#importing-the-samples-optional)
 
 After you've prepared and converted your sequence, you can now stream them from your disk right into Unity! This section shows you how to use the streaming and playback components inside of the editor, to setup a simple playback scene.
 
@@ -29,7 +29,7 @@ After you've prepared and converted your sequence, you can now stream them from 
 ![Add component](editor_playback_add_component.png)
 
 3. You should now see a Geometry Sequence Player and Geometry Sequence Stream component attached to your gameobject. Click on **"Open Sequence"** in the Player script, and then open the folder, in which your converted sequence is stored.
-    > ⚠️ When you're just trying out playback on your machine, or you don't intent to distribute your app to other PCs, it's fine to store the sequence anywhere on disk. However, if you plan to distribute your application, [please take a look here](/docs/tutorials/distribution)!
+    > ⚠️ When you're just trying out playback on your machine, or you don't intent to distribute your app to other PCs, it's fine to store the sequence anywhere on disk. However, if you plan to distribute your application, [please take a look here](/Unity_Geometry_Sequence_Streaming/docs/tutorials/distribution)!
   
     ![Open Sequence](editor_playback_open_sequence.png)
 
@@ -73,7 +73,7 @@ If activated, repeats the animation indefinitly
 
 #### Events (7)
 
-With this Unity Event control, you can define scripts which should receive events from this player. [More on Events](/docs/tutorials/scripting-api/#events)
+With this Unity Event control, you can define scripts which should receive events from this player. [More on Events](/Unity_Geometry_Sequence_Streaming/docs/tutorials/scripting-api/#events)
 
 #### Actual FPS / Frame drop (8)
 

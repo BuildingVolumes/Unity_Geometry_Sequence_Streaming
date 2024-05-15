@@ -13,7 +13,7 @@ weight: 30
 toc: true
 ---
 
-> 👉🏻 This is just a quick summary of the conversion process, more details can be [found here](/docs/tutorials/prepare-data/)
+> 👉🏻 This is just a quick summary of the conversion process, more details can be [found here](/Unity_Geometry_Sequence_Streaming/docs/tutorials/prepare-data/)
 
 ## Conversion
 

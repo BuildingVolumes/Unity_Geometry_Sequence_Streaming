@@ -16,7 +16,7 @@ toc: true
 ## Build and ship
 
 If you intent to distribute your Application built with the Unity Geometry Sequence Streamer, you need to consider where you store your geometry sequence.
-In Unity, you need to store all assets loaded at runtime in a [**Streamingassets**](https://docs.unity3d.com/Manual/StreamingAssets.html) folder ([exept for Android Builds](/docs/tutorials/distribution/#android)), located inside of the Asset path root, and store all geometry sequences in there. This folder will be copied into your build as-is.
+In Unity, you need to store all assets loaded at runtime in a [**Streamingassets**](https://docs.unity3d.com/Manual/StreamingAssets.html) folder ([exept for Android Builds](/Unity_Geometry_Sequence_Streaming/docs/tutorials/distribution/#android)), located inside of the Asset path root, and store all geometry sequences in there. This folder will be copied into your build as-is.
 
 1. Inside of the Unity project view, go to the "Assets" folder and create a **Streamingsassets** folder there:
 
