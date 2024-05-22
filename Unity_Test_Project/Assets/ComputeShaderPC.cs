@@ -6,7 +6,9 @@ using UnityEngine;
 public class ComputeShaderPC : MonoBehaviour
 {
     public ComputeShader pointcloudShader;
-    public Mesh mesh;
+    public MeshFilter sourceMesh;
+    public Mesh quadMesh;
+    public Material pointMat;
 
     // Start is called before the first frame update
     void Start()
@@ -17,11 +19,11 @@ public class ComputeShaderPC : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        _Point[] pointBufferCPU = new _Point[mesh.vertices.Length];
+        _Point[] pointBufferCPU = new _Point[sourceMesh.mesh.vertices.Length];
 
-        for (int i = 0; i < mesh.vertices.Length; i++)
+        for (int i = 0; i < sourceMesh.mesh.vertices.Length; i++)
         {
-            _Point p = new _Point(mesh.vertices[i], mesh.colors[i]);
+            _Point p = new _Point(sourceMesh.mesh.vertices[i], sourceMesh.mesh.colors[i]);
             pointBufferCPU[i] = p;
         }
 
@@ -29,6 +31,8 @@ public class ComputeShaderPC : MonoBehaviour
         pointBufferGPU.SetData(pointBufferCPU);
 
         pointcloudShader.SetBuffer(0, "_PointBuffer", pointBufferGPU);
+
+        pointcloudShader.Dispatch(0, pointBufferGPU.count / 128, 1, 1);
     }
 }
 

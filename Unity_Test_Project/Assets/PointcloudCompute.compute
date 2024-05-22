@@ -8,27 +8,24 @@ struct _VertexSource
     float4 color;
 };
 
-//The generated vertices, with four vertices per point, forming a plane
-struct _PointVertices
-{
-    float3 position;
-    float4 color;
-};
 
 //Representing one point (Essentially a quad), with a shared normal between all points (normal is always pointing towards the camera)
 struct _DrawPoint
 {
     float3 normalWS;
-    _PointVertices pointvertices[4];
+    float3 pointvertices[4];
+    float4 color;
 };
 
 //Compute Buffer
-StructuredBuffer<_VertexSource> _VertexSourceBuffer
-StructuredBuffer<int> :SourcePoints;
+RWStructuredBuffer<_VertexSource> _VertexSourceBuffer;
 AppendStructuredBuffer<_DrawPoint> _DrawPoints;
 
 [numthreads(128,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    
+    if (id.x < 128)
+        return;
+
+    _VertexSourceBuffer[id.x].color = new float4(1, 0, 0, 1);
 }
