@@ -1,0 +1,34 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+//The input vertices with their position and color. The vertex position is the origin position for the point
+struct _VertexSource
+{
+    float3 position;
+    float4 color;
+};
+
+//The generated vertices, with four vertices per point, forming a plane
+struct _PointVertices
+{
+    float3 position;
+    float4 color;
+};
+
+//Representing one point (Essentially a quad), with a shared normal between all points (normal is always pointing towards the camera)
+struct _DrawPoint
+{
+    float3 normalWS;
+    _PointVertices pointvertices[4];
+};
+
+//Compute Buffer
+StructuredBuffer<_VertexSource> _VertexSourceBuffer
+StructuredBuffer<int> :SourcePoints;
+AppendStructuredBuffer<_DrawPoint> _DrawPoints;
+
+[numthreads(128,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    
+}
