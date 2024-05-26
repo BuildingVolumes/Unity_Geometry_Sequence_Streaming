@@ -1,31 +1,79 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
 
-//The input vertices with their position and color. The vertex position is the origin position for the point
-struct _VertexSource
-{
-    float3 position;
-    float4 color;
-};
-
-
-//Representing one point (Essentially a quad), with a shared normal between all points (normal is always pointing towards the camera)
-struct _DrawPoint
-{
-    float3 normalWS;
-    float3 pointvertices[4];
-    float4 color;
-};
 
 //Compute Buffer
-RWStructuredBuffer<_VertexSource> _VertexSourceBuffer;
-AppendStructuredBuffer<_DrawPoint> _DrawPoints;
+RWByteAddressBuffer _PointBuffer;
+RWByteAddressBuffer _VertexBuffer;
+RWByteAddressBuffer _IndexBuffer;
 
-[numthreads(128,1,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+StructuredBuffer<float4x4> _LocalToWorldMatrix;
+
+
+
+[numthreads(128, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
 {
-    if (id.x < 128)
-        return;
+    //We access the raw vertex buffer of the mesh vertices. As this buffer is raw, we don't have a handy struct to navigate it
+			//and need to find the memory addresses ourselves.
 
-    _VertexSourceBuffer[id.x].color = new float4(1, 0, 0, 1);
+			//First, we need to know how much data a vertice contains. Luckily, as we create the mesh ourselves, we know that we have:
+			//One Vertex = float3 position, float3 normal, float4 tangent, float2 texCoord0, float 2 texCoord1
+			//Which is 14 32bit values, or 14 * 4bytes = 56 bytes per Vertex
+			//With this, we can get a memory index
+    uint pointIndex = id.x * 14;
+
+			//All values in the Raw vertex buffer can only be retrieved as ints. So we retrieve our first three ints, which is our position
+    uint3 positionRaw = _PointBuffer.Load3(pointIndex << 2);
+
+			//Turn them into floats
+    float3 position = asfloat(positionRaw);
+    float3 positionWorld = mul(_LocalToWorldMatrix[0], float4(position, 1.0));
+    
+    float3 posLeftUp = float3(1, 1, 0);
+    float3 posRightUp = float3(-1, 1, 0);
+    float3 posRightDown = float3(-1, -1, 0);
+    float3 posLeftDown = float3(1, -1, 0);
+    
+    posLeftUp += positionWorld;
+    posLeftDown += positionWorld;
+    posRightUp += positionWorld;
+    posRightDown += positionWorld;
+    
+    uint3 indice1 = uint3(2 + id.x * 4, 1 + id.x * 4, 0 + id.x * 4);
+    uint3 indice2 = uint3(0 + id.x * 4, 3 + id.x * 4, 2 + id.x * 4);
+    
+    float normal = float3(1, 0, 0);
+    
+    uint vertexIndex1 = id.x * 4 * 6 + 0;
+    uint vertexIndex2 = id.x * 4 * 6 + 6;
+    uint vertexIndex3 = id.x * 4 * 6 + 12;
+    uint vertexIndex4 = id.x * 4 * 6 + 18;
+    
+    uint normalIndex1 = id.x * 4 * 6 + 3;
+    uint normalIndex2 = id.x * 4 * 6 + 9;
+    uint normalIndex3 = id.x * 4 * 6 + 15;
+    uint normalIndex4 = id.x * 4 * 6 + 21;
+    
+    uint indiceIndex1 = id.x * 6 + 0;
+    uint indiceIndex2 = id.x * 6 + 3;
+    
+    _VertexBuffer.Store3(vertexIndex1 << 2, asuint(posLeftUp));
+    _VertexBuffer.Store3(vertexIndex2 << 2, asuint(posRightUp));
+    _VertexBuffer.Store3(vertexIndex3 << 2, asuint(posRightDown));
+    _VertexBuffer.Store3(vertexIndex4 << 2, asuint(posLeftDown));
+    
+    _VertexBuffer.Store3(normalIndex1 << 2, asuint(normal));
+    _VertexBuffer.Store3(normalIndex2 << 2, asuint(normal));
+    _VertexBuffer.Store3(normalIndex3 << 2, asuint(normal));
+    _VertexBuffer.Store3(normalIndex4 << 2, asuint(normal));
+    
+    _IndexBuffer.Store3(indiceIndex1 << 2, indice1);
+    _IndexBuffer.Store3(indiceIndex2 << 2, indice2);
+    
+    
+    
 }
+    
+    
+
