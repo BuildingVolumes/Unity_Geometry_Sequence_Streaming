@@ -3,77 +3,110 @@
 
 
 //Compute Buffer
-RWByteAddressBuffer _PointBuffer;
+RWByteAddressBuffer _PointSourceBuffer;
 RWByteAddressBuffer _VertexBuffer;
 RWByteAddressBuffer _IndexBuffer;
 
-StructuredBuffer<float4x4> _LocalToWorldMatrix;
+StructuredBuffer<float4x4> _toSourceWorld;
+StructuredBuffer<float4x4> _CameraToWorld;
+StructuredBuffer<float4x4> _WorldToCamera;
 
+float _PointScale;
 
+struct _PointQuad
+{
+    float3 vertex1;
+    float3 vertex2;
+    float3 vertex3;
+    float3 vertex4;
+    
+    uint3 triangle1;
+    uint3 triangle2;
+};
+
+float3 GetPositionFromPointSourceBuffer(int id)
+{
+    //We access the raw vertex buffer of the mesh vertices. As this buffer is raw, we don't have a handy struct to navigate it
+	//and need to find the memory addresses ourselves. As we create the mesh ourselves, we know that we have:
+	//One Vertex = float3 position, float3 normal, float4 tangent, float2 texCoord0, float 2 texCoord1
+	//Which is 14 32bit values, or 14 * 4bytes = 56 bytes per Vertex
+	//With this, we can get a memory index
+    uint pointIndex = id.x * 14;
+
+	//All values in the Raw vertex buffer can only be retrieved as ints. So we retrieve our first three ints, which is our position
+    uint3 positionRaw = _PointSourceBuffer.Load3(pointIndex << 2);
+
+	//Turn them into floats
+    return asfloat(positionRaw);
+}
+
+_PointQuad CreateQuad(float3 position, int id, float pointscale)
+{
+    _PointQuad outQuad = { float3(1, 1, 0), float3(-1, 1, 0), float3(-1, -1, 0), float3(1, -1, 0), uint3(0, 0, 0), uint3(0, 0, 0)};
+    
+    //Create our quad in screen space, to that it is always aligned to the camera
+    float ps = _PointScale;
+    float3 pSS = mul(_WorldToCamera[0], float4(position, 1.0)); //position in Screen Space
+
+    float3 posLeftUpScreen = float3(pSS.x + ps, pSS.y + ps, pSS.z);
+    float3 posRightUpScreen = float3(pSS.x - ps, pSS.y + ps, pSS.z);
+    float3 posRightDownScreen = float3(pSS.x - ps, pSS.y - ps, pSS.z);
+    float3 posLeftDownScreen = float3(pSS.x + ps, pSS.y - ps, pSS.z);
+        
+    //Convert it back into world space
+    outQuad.vertex1 = mul(_CameraToWorld[0], float4(posLeftUpScreen, 1.0));
+    outQuad.vertex2 = mul(_CameraToWorld[0], float4(posRightUpScreen, 1.0));
+    outQuad.vertex3 = mul(_CameraToWorld[0], float4(posRightDownScreen, 1.0));
+    outQuad.vertex4 = mul(_CameraToWorld[0], float4(posLeftDownScreen, 1.0));
+     
+    ////Create our triangles. We indice from the top right corner in an anti-clockwise direction
+    uint i = id * 4;
+    outQuad.triangle1 = uint3(2 + i, 1 + i, 0 + i);
+    outQuad.triangle2 = uint3(0 + i, 3 + i, 2 + i);
+    
+    return outQuad;
+}
+
+void StoreQuad(_PointQuad quad, int id)
+{
+    //The vertex buffer position for a quad is: Thread ID * 4 (vertices per quad) * 3 (floats per vertice)
+    uint vBufferPos = (id * 4 * 3);
+    
+    //Add offset for each vertex and then multiply by amount of bytes per float (4) to get the final byte adress
+    uint vPos1 = (vBufferPos + 0) * 4;
+    uint vPos2 = (vBufferPos + 3) * 4;
+    uint vPos3 = (vBufferPos + 6) * 4;
+    uint vPos4 = (vBufferPos + 9) * 4;
+    
+    //The indice buffer byte position for a quad is Thread ID * 2 (indices per quad) * 3 (ints per indice)
+    uint iBufferPos = id * 2 * 3;
+    
+    //Add offset for each indice and then multiply by amount of bytes per uint (4) to get the final byte adress
+    uint iPos1 = (iBufferPos + 0) * 4;
+    uint iPos2 = (iBufferPos + 3) * 4;
+    
+    _VertexBuffer.Store3(vPos1, asuint(quad.vertex1));
+    _VertexBuffer.Store3(vPos2, asuint(quad.vertex2));
+    _VertexBuffer.Store3(vPos3, asuint(quad.vertex3));
+    _VertexBuffer.Store3(vPos4, asuint(quad.vertex4));
+    
+    _IndexBuffer.Store3(iPos1, quad.triangle1);
+    _IndexBuffer.Store3(iPos2, quad.triangle2);
+}
 
 [numthreads(128, 1, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID)
 {
-    //We access the raw vertex buffer of the mesh vertices. As this buffer is raw, we don't have a handy struct to navigate it
-			//and need to find the memory addresses ourselves.
-
-			//First, we need to know how much data a vertice contains. Luckily, as we create the mesh ourselves, we know that we have:
-			//One Vertex = float3 position, float3 normal, float4 tangent, float2 texCoord0, float 2 texCoord1
-			//Which is 14 32bit values, or 14 * 4bytes = 56 bytes per Vertex
-			//With this, we can get a memory index
-    uint pointIndex = id.x * 14;
-
-			//All values in the Raw vertex buffer can only be retrieved as ints. So we retrieve our first three ints, which is our position
-    uint3 positionRaw = _PointBuffer.Load3(pointIndex << 2);
-
-			//Turn them into floats
-    float3 position = asfloat(positionRaw);
-    float3 positionWorld = mul(_LocalToWorldMatrix[0], float4(position, 1.0));
+    float3 position = GetPositionFromPointSourceBuffer(id.x);
     
-    float3 posLeftUp = float3(1, 1, 0);
-    float3 posRightUp = float3(-1, 1, 0);
-    float3 posRightDown = float3(-1, -1, 0);
-    float3 posLeftDown = float3(1, -1, 0);
+    float3 positionWorld = mul(_toSourceWorld[0], float4(position, 1.0));
     
-    posLeftUp += positionWorld;
-    posLeftDown += positionWorld;
-    posRightUp += positionWorld;
-    posRightDown += positionWorld;
+    _PointQuad quad = CreateQuad(positionWorld, id.x, _PointScale);
     
-    uint3 indice1 = uint3(2 + id.x * 4, 1 + id.x * 4, 0 + id.x * 4);
-    uint3 indice2 = uint3(0 + id.x * 4, 3 + id.x * 4, 2 + id.x * 4);
-    
-    float normal = float3(1, 0, 0);
-    
-    uint vertexIndex1 = id.x * 4 * 6 + 0;
-    uint vertexIndex2 = id.x * 4 * 6 + 6;
-    uint vertexIndex3 = id.x * 4 * 6 + 12;
-    uint vertexIndex4 = id.x * 4 * 6 + 18;
-    
-    uint normalIndex1 = id.x * 4 * 6 + 3;
-    uint normalIndex2 = id.x * 4 * 6 + 9;
-    uint normalIndex3 = id.x * 4 * 6 + 15;
-    uint normalIndex4 = id.x * 4 * 6 + 21;
-    
-    uint indiceIndex1 = id.x * 6 + 0;
-    uint indiceIndex2 = id.x * 6 + 3;
-    
-    _VertexBuffer.Store3(vertexIndex1 << 2, asuint(posLeftUp));
-    _VertexBuffer.Store3(vertexIndex2 << 2, asuint(posRightUp));
-    _VertexBuffer.Store3(vertexIndex3 << 2, asuint(posRightDown));
-    _VertexBuffer.Store3(vertexIndex4 << 2, asuint(posLeftDown));
-    
-    _VertexBuffer.Store3(normalIndex1 << 2, asuint(normal));
-    _VertexBuffer.Store3(normalIndex2 << 2, asuint(normal));
-    _VertexBuffer.Store3(normalIndex3 << 2, asuint(normal));
-    _VertexBuffer.Store3(normalIndex4 << 2, asuint(normal));
-    
-    _IndexBuffer.Store3(indiceIndex1 << 2, indice1);
-    _IndexBuffer.Store3(indiceIndex2 << 2, indice2);
-    
-    
-    
+    StoreQuad(quad, id.x);
 }
+
+
     
     
 
