@@ -8,8 +8,11 @@ public class ComputeShaderPC : MonoBehaviour
     public MeshFilter sourceMeshFilter;
     public MeshFilter outputMeshFilter;
     public Mesh outputMesh;
+    public Mesh oldMesh;
 
     public float pointScale = 0.1f;
+
+    int currentPointCount = 0;
 
     //GraphicsBuffer graphicsBuffer;
     //GraphicsBuffer.IndirectDrawIndexedArgs[] graphicsData;
@@ -25,15 +28,27 @@ public class ComputeShaderPC : MonoBehaviour
     static readonly int matrixCameraToWorldID = Shader.PropertyToID("_CameraToWorld");
     static readonly int matrixWorldToCameraID = Shader.PropertyToID("_WorldToCamera");
     static readonly int pointScaleID = Shader.PropertyToID("_PointScale");
+    static readonly int pointCountID = Shader.PropertyToID("_PointCount");
 
     private void Start()
     {
-        SetupOutputMesh(sourceMeshFilter.mesh.vertexCount);
     }
 
     // Update is called once per frame
     void Update()
     {
+        if (sourceMeshFilter.sharedMesh == null || sourceMeshFilter.sharedMesh.vertexCount == 0)
+            return;
+
+        int sourcePointCount = sourceMeshFilter.sharedMesh.vertexCount;
+
+        bool resized = sourcePointCount != currentPointCount;
+
+        if(sourcePointCount > currentPointCount)
+            SetupOutputMesh(sourcePointCount, sourceMeshFilter.sharedMesh);
+
+        currentPointCount = sourcePointCount;
+
         // Get the vertex buffer of the source point mesh, and set it up
         // as a buffer parameter to a compute shader. This will act as a
         //position and color source for the rendered points
@@ -61,11 +76,10 @@ public class ComputeShaderPC : MonoBehaviour
         GraphicsBuffer worldToCameraBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, 4 * 4 * 4);
         worldToCameraBuffer.SetData(new Matrix4x4[] { Camera.main.worldToCameraMatrix });
 
-        //if (outputMesh != null)
-        //    outputMesh.Clear();
-
         vertexBuffer = outputMesh.GetVertexBuffer(0);
         indexBuffer = outputMesh.GetIndexBuffer();
+
+        
 
         pointcloudShader.SetBuffer(0, pointSourceID, pointBuffer);
         pointcloudShader.SetBuffer(0, vertexBufferID, vertexBuffer);
@@ -74,35 +88,72 @@ public class ComputeShaderPC : MonoBehaviour
         pointcloudShader.SetBuffer(0, matrixWorldToCameraID, worldToCameraBuffer);
         pointcloudShader.SetBuffer(0, matrixCameraToWorldID, cameraToWorldBuffer);  
         pointcloudShader.SetFloat(pointScaleID, pointScale);  
-        pointcloudShader.Dispatch(0, Mathf.CeilToInt(sourceMeshFilter.sharedMesh.vertexCount / 128f), 1, 1);
+        pointcloudShader.SetInt(pointCountID, sourcePointCount);
+        int groupSize = Mathf.CeilToInt(sourcePointCount / 128f);
+        pointcloudShader.Dispatch(0, groupSize, 1, 1);
+
+        if (resized)
+        {
+            pointcloudShader.SetBuffer(1, vertexBufferID, vertexBuffer);
+            pointcloudShader.SetBuffer(1, indexBufferID, indexBuffer);
+            pointcloudShader.SetInt(pointCountID, sourcePointCount);
+            pointcloudShader.Dispatch(1, Mathf.CeilToInt(vertexBuffer.count / 128f), 1, 1);
+        }
 
         outputMeshFilter.sharedMesh = outputMesh;
 
         pointBuffer.Release();
-        vertexBuffer.Release();
-        indexBuffer.Release();
         toSourceWorldBuffer.Release();
         worldToCameraBuffer.Release();
         cameraToWorldBuffer.Release();
     }
 
-    void SetupOutputMesh(int pointCount)
+    void SetupOutputMesh(int pointCount, Mesh sourcePoints)
     {
-        outputMesh = new Mesh();
+
+        FreeMeshContent();
+
+        if(outputMesh == null)
+            outputMesh = new Mesh();
 
         outputMesh.indexBufferTarget |= GraphicsBuffer.Target.Raw;
         outputMesh.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
 
         VertexAttributeDescriptor vp = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3);
+        VertexAttributeDescriptor vc = new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4);
 
-        outputMesh.SetVertexBufferParams(pointCount * 4, vp);
+        outputMesh.SetVertexBufferParams(pointCount * 4, vp, vc);
         outputMesh.SetIndexBufferParams(pointCount * 6, IndexFormat.UInt32);
 
         outputMesh.SetSubMesh(0, new SubMeshDescriptor(0, pointCount * 6), MeshUpdateFlags.DontRecalculateBounds);
+        outputMesh.bounds = new Bounds(Vector3.zero, Vector3.one * 10);
+
 
         vertexBuffer = outputMesh.GetVertexBuffer(0);
         indexBuffer = outputMesh.GetIndexBuffer();
 
+    }
+
+    private void OnDisable()
+    {
+        FreeMeshContent();
+        Object.Destroy(outputMesh);
+    }
+
+    void FreeMeshContent()
+    {
+        if (vertexBuffer != null)
+        {
+            //Don't know which should be used, so just do both
+            vertexBuffer.Release();
+            indexBuffer.Release();
+            vertexBuffer.Dispose();
+            indexBuffer.Dispose();
+            
+        }
+
+        if(outputMesh != null)
+            outputMesh.Clear();
     }
 }
 

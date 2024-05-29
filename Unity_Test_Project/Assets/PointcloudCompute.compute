@@ -1,5 +1,6 @@
 // Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel CSMain
+#pragma kernel CreatePointcloud
+#pragma kernel CleanupPointcloud
 
 
 //Compute Buffer
@@ -12,14 +13,15 @@ StructuredBuffer<float4x4> _CameraToWorld;
 StructuredBuffer<float4x4> _WorldToCamera;
 
 float _PointScale;
+int _PointCount;
 
 struct _PointQuad
 {
     float3 vertex1;
     float3 vertex2;
     float3 vertex3;
-    float3 vertex4;
-    
+    float3 vertex4;    
+
     uint3 triangle1;
     uint3 triangle2;
 };
@@ -28,16 +30,20 @@ float3 GetPositionFromPointSourceBuffer(int id)
 {
     //We access the raw vertex buffer of the mesh vertices. As this buffer is raw, we don't have a handy struct to navigate it
 	//and need to find the memory addresses ourselves. As we create the mesh ourselves, we know that we have:
-	//One Vertex = float3 position, float3 normal, float4 tangent, float2 texCoord0, float 2 texCoord1
-	//Which is 14 32bit values, or 14 * 4bytes = 56 bytes per Vertex
-	//With this, we can get a memory index
-    uint pointIndex = id.x * 14;
+	//Vertex = float3 position (3 floats) + unorm8 vertexcolor (1 uint) = 4 * 4 bytes per vertex
+    uint pointIndex = id.x * 4 * 4;
 
-	//All values in the Raw vertex buffer can only be retrieved as ints. So we retrieve our first three ints, which is our position
-    uint3 positionRaw = _PointSourceBuffer.Load3(pointIndex << 2);
+	//All values in the Raw vertex buffer can only be retrieved as ints
+    uint3 positionRaw = _PointSourceBuffer.Load3(pointIndex);
 
-	//Turn them into floats
+	//Reinterpret the int position into floats
     return asfloat(positionRaw);
+}
+
+uint GetColorFromPointSourceBuffer(int id)
+{
+    uint pointIndex = id.x * 4 * 4 + 12;
+    return _PointSourceBuffer.Load(pointIndex + 12);
 }
 
 _PointQuad CreateQuad(float3 position, int id, float pointscale)
@@ -46,7 +52,7 @@ _PointQuad CreateQuad(float3 position, int id, float pointscale)
     
     //Create our quad in screen space, to that it is always aligned to the camera
     float ps = _PointScale;
-    float3 pSS = mul(_WorldToCamera[0], float4(position, 1.0)); //position in Screen Space
+    float3 pSS = mul(_WorldToCamera[0], float4(position, 1.0)).xyz; //position in Screen Space
 
     float3 posLeftUpScreen = float3(pSS.x + ps, pSS.y + ps, pSS.z);
     float3 posRightUpScreen = float3(pSS.x - ps, pSS.y + ps, pSS.z);
@@ -54,11 +60,11 @@ _PointQuad CreateQuad(float3 position, int id, float pointscale)
     float3 posLeftDownScreen = float3(pSS.x + ps, pSS.y - ps, pSS.z);
         
     //Convert it back into world space
-    outQuad.vertex1 = mul(_CameraToWorld[0], float4(posLeftUpScreen, 1.0));
-    outQuad.vertex2 = mul(_CameraToWorld[0], float4(posRightUpScreen, 1.0));
-    outQuad.vertex3 = mul(_CameraToWorld[0], float4(posRightDownScreen, 1.0));
-    outQuad.vertex4 = mul(_CameraToWorld[0], float4(posLeftDownScreen, 1.0));
-     
+    outQuad.vertex1 = mul(_CameraToWorld[0], float4(posLeftUpScreen, 1.0)).xyz;
+    outQuad.vertex2 = mul(_CameraToWorld[0], float4(posRightUpScreen, 1.0)).xyz;
+    outQuad.vertex3 = mul(_CameraToWorld[0], float4(posRightDownScreen, 1.0)).xyz;
+    outQuad.vertex4 = mul(_CameraToWorld[0], float4(posLeftDownScreen, 1.0)).xyz;
+       
     ////Create our triangles. We indice from the top right corner in an anti-clockwise direction
     uint i = id * 4;
     outQuad.triangle1 = uint3(2 + i, 1 + i, 0 + i);
@@ -67,16 +73,20 @@ _PointQuad CreateQuad(float3 position, int id, float pointscale)
     return outQuad;
 }
 
-void StoreQuad(_PointQuad quad, int id)
+void StoreQuad(_PointQuad quad, uint color, int id)
 {
-    //The vertex buffer position for a quad is: Thread ID * 4 (vertices per quad) * 3 (floats per vertice)
-    uint vBufferPos = (id * 4 * 3);
+    //The vertex buffer position for a quad is: Thread ID * 4 (vertices per quad) * (3 (floats per vertice) + 1 (uint for color))
+    uint vBufferPos = (id * 4 * (3 + 1));
     
-    //Add offset for each vertex and then multiply by amount of bytes per float (4) to get the final byte adress
+    //Add offset for each vertex + vertexcolor and then multiply by amount of bytes per float (4) to get the final byte adress
     uint vPos1 = (vBufferPos + 0) * 4;
-    uint vPos2 = (vBufferPos + 3) * 4;
-    uint vPos3 = (vBufferPos + 6) * 4;
-    uint vPos4 = (vBufferPos + 9) * 4;
+    uint cPos1 = (vBufferPos + 3) * 4;
+    uint vPos2 = (vBufferPos + 4) * 4;
+    uint cPos2 = (vBufferPos + 7) * 4;
+    uint vPos3 = (vBufferPos + 8) * 4;
+    uint cPos3 = (vBufferPos + 11) * 4;
+    uint vPos4 = (vBufferPos + 12) * 4;
+    uint cPos4 = (vBufferPos + 15) * 4;
     
     //The indice buffer byte position for a quad is Thread ID * 2 (indices per quad) * 3 (ints per indice)
     uint iBufferPos = id * 2 * 3;
@@ -86,26 +96,48 @@ void StoreQuad(_PointQuad quad, int id)
     uint iPos2 = (iBufferPos + 3) * 4;
     
     _VertexBuffer.Store3(vPos1, asuint(quad.vertex1));
+    _VertexBuffer.Store(cPos1, color);
     _VertexBuffer.Store3(vPos2, asuint(quad.vertex2));
+    _VertexBuffer.Store(cPos2, color);
     _VertexBuffer.Store3(vPos3, asuint(quad.vertex3));
+    _VertexBuffer.Store(cPos3, color);
     _VertexBuffer.Store3(vPos4, asuint(quad.vertex4));
+    _VertexBuffer.Store(cPos4, color);
+
     
     _IndexBuffer.Store3(iPos1, quad.triangle1);
     _IndexBuffer.Store3(iPos2, quad.triangle2);
 }
 
 [numthreads(128, 1, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID)
+void CreatePointcloud(uint3 id : SV_DispatchThreadID)
 {
-    float3 position = GetPositionFromPointSourceBuffer(id.x);
+    if (id.x >= (uint)_PointCount)        
+        return;
     
-    float3 positionWorld = mul(_toSourceWorld[0], float4(position, 1.0));
+    float3 position = GetPositionFromPointSourceBuffer(id.x);
+    uint color = GetColorFromPointSourceBuffer(id.x);
+    
+    float3 positionWorld = mul(_toSourceWorld[0], float4(position, 1.0)).xyz;
     
     _PointQuad quad = CreateQuad(positionWorld, id.x, _PointScale);
     
-    StoreQuad(quad, id.x);
+    StoreQuad(quad, color, id.x);
 }
 
+
+//Reset position and index of unused points (if the point count is less than the buffer size)
+[numthreads(128,1,1)]
+void CleanupPointcloud(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x < (uint) _PointCount)
+        return;
+    
+    _PointQuad emptyQuad = { float3(0, 0, 0), float3(0, 0, 0), float3(0, 0, 0), float3(0, 0, 0), uint3(0, 0, 0), uint3(0, 0, 0)};
+    StoreQuad(emptyQuad, 0, id.x);
+    
+   
+}
 
     
     
