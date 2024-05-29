@@ -43,7 +43,7 @@ float3 GetPositionFromPointSourceBuffer(int id)
 uint GetColorFromPointSourceBuffer(int id)
 {
     uint pointIndex = id.x * 4 * 4 + 12;
-    return _PointSourceBuffer.Load(pointIndex + 12);
+    return _PointSourceBuffer.Load(pointIndex);
 }
 
 _PointQuad CreateQuad(float3 position, int id, float pointscale)
