@@ -12,7 +12,7 @@ public class ComputeShaderPC : MonoBehaviour
 
     public float pointScale = 0.1f;
 
-    int currentPointCount = 0;
+    int allocatedPointCount = 0;
 
     //GraphicsBuffer graphicsBuffer;
     //GraphicsBuffer.IndirectDrawIndexedArgs[] graphicsData;
@@ -41,13 +41,9 @@ public class ComputeShaderPC : MonoBehaviour
             return;
 
         int sourcePointCount = sourceMeshFilter.sharedMesh.vertexCount;
-
-        bool resized = sourcePointCount != currentPointCount;
-
-        if(sourcePointCount > currentPointCount)
-            SetupOutputMesh(sourcePointCount, sourceMeshFilter.sharedMesh);
-
-        currentPointCount = sourcePointCount;
+        bool resized = sourcePointCount != allocatedPointCount;
+        if(sourcePointCount > allocatedPointCount)
+            allocatedPointCount = SetupOutputMesh(sourcePointCount, sourceMeshFilter.sharedMesh);
 
         // Get the vertex buffer of the source point mesh, and set it up
         // as a buffer parameter to a compute shader. This will act as a
@@ -77,9 +73,7 @@ public class ComputeShaderPC : MonoBehaviour
         worldToCameraBuffer.SetData(new Matrix4x4[] { Camera.main.worldToCameraMatrix });
 
         vertexBuffer = outputMesh.GetVertexBuffer(0);
-        indexBuffer = outputMesh.GetIndexBuffer();
-
-        
+        indexBuffer = outputMesh.GetIndexBuffer();        
 
         pointcloudShader.SetBuffer(0, pointSourceID, pointBuffer);
         pointcloudShader.SetBuffer(0, vertexBufferID, vertexBuffer);
@@ -108,16 +102,19 @@ public class ComputeShaderPC : MonoBehaviour
         cameraToWorldBuffer.Release();
     }
 
-    void SetupOutputMesh(int pointCount, Mesh sourcePoints)
+    int SetupOutputMesh(int pointCount, Mesh sourcePoints)
     {
 
-        FreeMeshContent();
+        ReleaseBuffers();
 
         if(outputMesh == null)
             outputMesh = new Mesh();
 
         outputMesh.indexBufferTarget |= GraphicsBuffer.Target.Raw;
         outputMesh.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
+
+        //We allocate around 20% more vertices than we need, so that we dont need to re-allocate every frame. Allocating is expensive, memory is cheap
+        pointCount += (pointCount / 100) * 20;
 
         VertexAttributeDescriptor vp = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3);
         VertexAttributeDescriptor vc = new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4);
@@ -128,19 +125,19 @@ public class ComputeShaderPC : MonoBehaviour
         outputMesh.SetSubMesh(0, new SubMeshDescriptor(0, pointCount * 6), MeshUpdateFlags.DontRecalculateBounds);
         outputMesh.bounds = new Bounds(Vector3.zero, Vector3.one * 10);
 
-
         vertexBuffer = outputMesh.GetVertexBuffer(0);
         indexBuffer = outputMesh.GetIndexBuffer();
 
+        return pointCount;
     }
 
     private void OnDisable()
     {
-        FreeMeshContent();
+        ReleaseBuffers();
         Object.Destroy(outputMesh);
     }
 
-    void FreeMeshContent()
+    void ReleaseBuffers()
     {
         if (vertexBuffer != null)
         {
@@ -148,12 +145,8 @@ public class ComputeShaderPC : MonoBehaviour
             vertexBuffer.Release();
             indexBuffer.Release();
             vertexBuffer.Dispose();
-            indexBuffer.Dispose();
-            
+            indexBuffer.Dispose();            
         }
-
-        if(outputMesh != null)
-            outputMesh.Clear();
     }
 }
 
