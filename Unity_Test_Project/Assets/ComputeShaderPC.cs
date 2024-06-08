@@ -14,8 +14,8 @@ public class ComputeShaderPC : MonoBehaviour
 
     int allocatedPointCount = 0;
 
-    //GraphicsBuffer graphicsBuffer;
-    //GraphicsBuffer.IndirectDrawIndexedArgs[] graphicsData;
+    int oldPointcount;
+    int newPointcount;
 
     GraphicsBuffer vertexBuffer;
     GraphicsBuffer indexBuffer;
@@ -48,6 +48,15 @@ public class ComputeShaderPC : MonoBehaviour
         // Get the vertex buffer of the source point mesh, and set it up
         // as a buffer parameter to a compute shader. This will act as a
         //position and color source for the rendered points
+
+        newPointcount = sourceMeshFilter.mesh.vertexCount;
+        if(newPointcount == oldPointcount)
+        {
+            return;
+        }
+
+        oldPointcount = newPointcount;
+
         sourceMeshFilter.mesh.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
         GraphicsBuffer pointBuffer = sourceMeshFilter.mesh.GetVertexBuffer(0);
 
