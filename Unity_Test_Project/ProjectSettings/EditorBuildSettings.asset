@@ -6,6 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/TestScene.unity
-    guid: dc30a9a662b56354ab9248f36f52ec0f
+    path: Assets/ComputeShaderDev.unity
+    guid: cbbd4c97a8726eb4497ad6a13d458f2e
   m_configObjects: {}

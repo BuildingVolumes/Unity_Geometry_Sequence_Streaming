@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "com.buildingvolumes.geometry_sequence_streaming": {
-      "version": "file:C:/Dev/Volcapture/Visualization/Unity_Geometry_Sequence_Streaming/Geometry_Sequence_Streaming_Package",
+      "version": "file:C:/Dev/VolumetricCapture/Unity Package/Unity_Geometry_Sequence_Streaming/Geometry_Sequence_Streaming_Package",
       "depth": 0,
       "source": "local",
       "dependencies": {
