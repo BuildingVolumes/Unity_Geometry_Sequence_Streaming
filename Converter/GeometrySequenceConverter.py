@@ -5,7 +5,10 @@ import pymeshlab as ml
 import dearpygui.dearpygui as dpg
 import numpy as np
 import configparser
-import threading
+from multiprocessing.pool import ThreadPool
+from threading import Lock
+from threading import Event
+import json
 
 ### +++++++++++++++++++++++++  PACKAGE INTO SINGLE EXECUTABLE ++++++++++++++++++++++++++++++++++
 #Use this prompt in the terminal to package this script into a single executable for your system
@@ -33,31 +36,49 @@ last_model_path = ""
 input_sequence_list_models = []
 input_sequence_list_images = []
 
+is_running = False
 is_pointcloud = False
 input_valid = False
 output_valid = False
-is_running = False
-is_stopped = False
 
-image_processed_Index = 0
-model_processed_Index = 0
+metaDataLock = Lock()
+progressbarLock = Lock()
+termination_signal = Event()
+modelPool = None
+texturePool = None
+
+processed_files = 0
 total_file_count = 0
 max_active_threads = 4
 
 valid_model_types = ["obj", "3ds", "fbx", "glb", "gltf", "obj", "ply", "ptx", "stl", "xyz", "pts"]
 valid_image_types = ["jpg", "jpeg", "png", "tiff", "dds", "bmp", "tga"]
 
+metaData = {
+    "geometryType" : None,
+    "textureMode" : None,
+    "maxVertexCount": 0,
+    "maxTriangleCount" : 0,
+    "maxBounds" : [0, 0, 0, 0, 0, 0],
+    "textureWidth" : 0,
+    "textureHeight" : 0,
+    "models" : [],
+    "textures" : []
+}
+
 
 def setup_converter():
 
-    global is_running
+    global processed_files
     global total_file_count
-    global model_processed_Index
-    global image_processed_Index
     global max_active_threads
+    global termination_signal
+    global is_running
 
-    if(is_running == True):
-        return False
+    if(is_running):
+        return
+
+    termination_signal.clear()
 
     dpg.set_value(text_error_log_ID, "")
     dpg.set_value(text_info_log_ID, "")
@@ -70,19 +91,81 @@ def setup_converter():
         dpg.set_value(text_error_log_ID, "Output folder is not configured correctly")
         return False
 
+    max_active_threads= dpg.get_value("threadCount")
+    total_file_count = len(input_sequence_list_images) + len(input_sequence_list_models)
+    
+    processed_files = 0
+    dpg.set_value(progress_bar_ID, 1 / total_file_count)
+
+    process()
+
+def process():
+
+    global is_running
+    is_running = True
+    process_models()
+    process_images()
+
+    dpg.set_value(text_info_log_ID, "Converting...")
     dpg.set_value(progress_bar_ID, 0)
 
-    max_active_threads= dpg.get_value("threadCount")
-    model_processed_Index = 0
-    image_processed_Index = 0
-    total_file_count = len(input_sequence_list_images) + len(input_sequence_list_models)
-    is_running = True
+def advance_progressbar():
 
+    global progressbarLock
+    global total_file_count
+    global processed_files
 
+    progressbarLock.acquire()
+
+    processed_files += 1
+
+    if(termination_signal.is_set() == False):
+        dpg.set_value(progress_bar_ID, processed_files / total_file_count)
+        progresstext = "Converting: " + str(processed_files) + " / " + str(total_file_count)
+        dpg.set_value(text_info_log_ID, progresstext)
+
+    else:
+        dpg.set_value(progress_bar_ID, 1)
+        dpg.set_value(text_info_log_ID, "Canceling...")
+
+    progressbarLock.release()
+
+    if(processed_files == total_file_count):
+        finish_process()
+
+def finish_process():
+
+    global is_running
+    global termination_signal
+    global modelPool
+    global texturePool
+
+    write_metaData(path_to_output_sequence)
+    dpg.set_value(text_info_log_ID, "Finished!")
+
+    if(termination_signal.is_set()):
+        dpg.set_value(text_info_log_ID, "Canceled!")
+    
+    dpg.set_value(progress_bar_ID, 0)
+
+    modelPool.close()
+    texturePool.close()
+    is_running = False
+
+def process_models():
+
+    global modelPool
+    modelPool = ThreadPool(processes= max_active_threads)
+    modelPool.map_async(convert_model, input_sequence_list_models)
 
 def convert_model(file):
 
     global is_pointcloud
+    global termination_signal
+
+    if(termination_signal.is_set()):
+        advance_progressbar()
+        return
 
     splitted_file = file.split(".")
     splitted_file.pop() # We remove the last element, which is the file ending
@@ -94,6 +177,10 @@ def convert_model(file):
     ms = ml.MeshSet()
 
     ms.load_new_mesh(inputfile)
+
+    if(termination_signal.is_set()):
+        advance_progressbar()
+        return
 
     faceCount = len(ms.current_mesh().face_matrix())        
     
@@ -118,7 +205,9 @@ def convert_model(file):
         ms.apply_filter("meshing_poly_to_tri")
 
     
-
+    if(termination_signal.is_set()):
+        advance_progressbar()
+        return
 
     vertices = None
     vertice_colors = None
@@ -136,6 +225,26 @@ def convert_model(file):
 
         if(has_UVs == True):     
             uvs = ms.current_mesh().vertex_tex_coord_matrix().astype(np.float32)
+
+    vertexCount = len(vertices)
+
+    if(faces is not None):
+        triangleCount = len(faces)
+    else:
+        triangleCount = 0
+
+    bounds = ms.current_mesh().bounding_box()
+
+    if(is_pointcloud == True):
+        geoType = "points"
+    else:
+        geoType = "mesh"
+
+    if(termination_signal.is_set()):
+        advance_progressbar()
+        return
+
+    set_metadata_Model(vertexCount, triangleCount, bounds, geoType)
     
     #The meshlab exporter doesn't support all the features we need, so we export the files manually
     #to PLY with our very stringent structure. This is needed because we want to keep the
@@ -217,12 +326,24 @@ def convert_model(file):
                 body.extend(faceRaw[index * 3 * 4: (index * 3 * 4) + 12])
 
 
-        f.write(bytes(body))    
+        f.write(bytes(body))
 
+    advance_progressbar()    
+
+def process_images():
+
+    global texturePool
+    texturePool = ThreadPool(processes= max_active_threads)
+    texturePool.map_async(convert_image, input_sequence_list_images)
 
 def convert_image(file):
 
     global last_image_path
+    global termination_signal
+
+    if(termination_signal.is_set()):
+        advance_progressbar()
+        return
 
     splitted_file = file.split(".")
     splitted_file.pop() # We remove the last element, which is the file ending
@@ -232,13 +353,76 @@ def convert_image(file):
     outputfile =  path_to_output_sequence + "\\" + file_name + ".dds"
 
     cmd = [application_path + path_to_resources + "nvcompress", "-nomips", "-bc1", "-silent", inputfile, outputfile]
-    return_code = subprocess.call(cmd)
+    subprocess.call(cmd)
 
-    if(return_code != 0):
-        cmd =  [application_path + path_to_resources + "nvcompress", "-nomips", "-bc1", "-silent", application_path + path_to_resources + "empty.png", outputfile]
-        return_code = subprocess.call(cmd)
+    height = -1
+    width = -1
+
+    # We don't need to do this for every file, just the first one
+    if(metaData["height"] == 0 or metaData["width"] == 0):
+        with open(outputfile, mode='rb') as file: # b is important -> binary
+            fileContent = file.read()
+            height = fileContent[13] * 256 + fileContent[12]
+            width = fileContent[17] * 256 + fileContent[16]
+
+    size = os.path.getsize(outputfile) - 128
+
+    set_metadata_texture(width, height, size)
 
 
+def set_metadata_Model(vertexCount, triangleCount, bounds, geometryType):
+    
+    global metaDataLock
+    global metaData
+
+    metaDataLock.acquire()
+
+    if(metaData["geometryType"] is None):
+        metaData["geometryType"] = geometryType
+
+    if(vertexCount > metaData["maxVertexCount"]):
+        metaData["maxVertexCount"] = vertexCount
+
+    if(triangleCount > metaData["maxTriangleCount"]):
+        metaData["maxTriangleCount"] = triangleCount
+
+    for maxBound in range(3):
+        if metaData["maxBounds"][maxBound] < bounds.max()[maxBound]:
+            metaData["maxBounds"][maxBound] = bounds.max()[maxBound]
+
+    for minBound in range(3):
+        if metaData["maxBounds"][minBound + 3] > bounds.min()[minBound]:
+            metaData["maxBounds"][minBound + 3] = bounds.min()[minBound]
+
+    metaData["models"].append((vertexCount, triangleCount))
+
+    metaDataLock.release()
+
+def set_metadata_texture(height, width, size):
+
+    global metaDataLock
+    global metaData
+
+    metaDataLock.acquire()
+
+    if(height > metaData["height"]):
+        metaData["height"] = height
+    
+    if(width > metaData["width"]):
+        metaData["width"] = width
+    
+    metaData["textures"].append(size)
+
+    metaDataLock.release()
+
+
+
+def write_metaData(outputPath):
+    global metaData
+    outputPath = outputPath + "/sequence.json"
+
+    with open(outputPath, 'w') as f:
+        json.dump(metaData, f)
 
 def validate_input_files(input_path):
 
@@ -267,6 +451,7 @@ def validate_input_files(input_path):
         return True
 
 
+        
 #----------------------- UI Logic ---------------------------
 
 
@@ -354,8 +539,8 @@ def copy_input_to_output_dir():
     set_output_files(path_to_input_sequence)
 
 def cancel_processing_callback():
-    global is_stopped
-    is_stopped = True
+    global termination_signal
+    termination_signal.set()
 
 def show_input():
     dpg.show_item("file_input_dialog_id")
@@ -395,11 +580,8 @@ def save_config(key, value):
     with open(path_to_config, "w") as configfile:
             config.write(configfile)
 
-    
 
-
-
-# Main Loop
+# Main UI Loop
 
 dpg.create_viewport(height=500, width=500, title="Geometry Sequence Converter")
 dpg.setup_dearpygui()
@@ -442,85 +624,19 @@ load_config()
 set_input_files(read_config("input"))
 set_output_files(read_config("output"))
 
-image_threads = []
-model_threads = []
-
 while dpg.is_dearpygui_running():
 
-    if(is_running):
-
-        #Process images
-        if(image_processed_Index < len(input_sequence_list_images)):
-
-            targetThreadCount = max_active_threads / 2
-            if(model_processed_Index >= len(input_sequence_list_models)):
-                targetThreadCount = max_active_threads
-
-            while(len(image_threads) < targetThreadCount):
-                imageThread = threading.Thread(target=convert_image, args=(input_sequence_list_images[image_processed_Index],))
-                imageThread.start()
-                image_threads.append(imageThread)
-                image_processed_Index += 1
-
-                if(image_processed_Index >= len(input_sequence_list_images)):
-                    break
-            
-            for image_thread in image_threads.copy():
-                if not (image_thread.is_alive()):
-                    image_threads.remove(image_thread)
-                
-            
-        
-        #Process models
-        if(model_processed_Index < len(input_sequence_list_models)):
-
-            targetThreadCount = max_active_threads / 2
-            if(image_processed_Index >= len(input_sequence_list_images)):
-                targetThreadCount = max_active_threads
-
-            while(len(model_threads) < targetThreadCount):
-                modelThread = threading.Thread(target=convert_model, args=(input_sequence_list_models[model_processed_Index],))                 
-                modelThread.start()
-                model_threads.append(modelThread)
-                model_processed_Index += 1
-
-                if(model_processed_Index >= len(input_sequence_list_models)):
-                    break
-                          
-            for model_thread in model_threads.copy():
-                if not (model_thread.is_alive()):
-                    model_threads.remove(model_thread)
-
-        processed_file_count = image_processed_Index + model_processed_Index
-        dpg.set_value(progress_bar_ID, processed_file_count / total_file_count)
-
-        if(processed_file_count == total_file_count):
-
-            for image_thread in image_threads:
-                image_thread.join()
-        
-            for model_thread in model_threads:
-                model_thread.join()
-
-            is_running = False
-            dpg.set_value(text_info_log_ID, "Finished!")
-            dpg.set_value(progress_bar_ID, 0)
-
-
-    if(is_stopped):
-
-        for image_thread in image_threads:
-            image_thread.join()
-        
-        for model_thread in model_threads:
-            model_thread.join()
-
-        is_running = False
-        is_stopped = False
-        dpg.set_value(text_info_log_ID, "Canceled!")
-        dpg.set_value(progress_bar_ID, 0)
-
-
     dpg.render_dearpygui_frame()
+
+# Shutdown threads when they are still running
+cancel_processing_callback()
+
+if(modelPool is not None):
+    modelPool.close()
+    modelPool.join()
+
+if(texturePool is not None):
+    texturePool.close()
+    texturePool.join()
 
 dpg.destroy_context()
