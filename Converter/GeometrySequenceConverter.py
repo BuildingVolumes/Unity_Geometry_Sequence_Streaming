@@ -28,8 +28,10 @@ path_to_resources = "resources\\"
 path_to_config = application_path + path_to_resources + "config.ini"
 config = None
 
-path_to_input_sequence = "[No folder set]"
-path_to_output_sequence = "[No folder set]"
+no_path_warning = "[No folder set]"
+path_to_input_sequence = no_path_warning
+path_to_output_sequence = no_path_warning
+path_to_output_sequence_proposed = ""
 last_image_path = ""
 last_model_path = ""
 
@@ -87,9 +89,12 @@ def setup_converter():
         dpg.set_value(text_error_log_ID, "Input files are not configured correctly")
         return False
 
-    if(output_valid == False):
+    if(output_valid == False and path_to_output_sequence_proposed == "" ):
         dpg.set_value(text_error_log_ID, "Output folder is not configured correctly")
         return False
+    
+    if(output_valid == False and len(path_to_output_sequence) > 1 ):
+        os.mkdir(path_to_output_sequence_proposed)
 
     max_active_threads= dpg.get_value("threadCount")
     total_file_count = len(input_sequence_list_images) + len(input_sequence_list_models)
@@ -172,7 +177,7 @@ def convert_model(file):
     file_name = ''.join(splitted_file)
 
     inputfile = path_to_input_sequence + "\\"+ file
-    outputfile =  path_to_output_sequence + "\\" + file_name + ".ply"
+    outputfile =  get_output_path() + "\\" + file_name + ".ply"
 
     ms = ml.MeshSet()
 
@@ -350,7 +355,7 @@ def convert_image(file):
     file_name = ''.join(splitted_file)
 
     inputfile = path_to_input_sequence + "\\"+ file
-    outputfile =  path_to_output_sequence + "\\" + file_name + ".dds"
+    outputfile =  get_output_path() + "\\" + file_name + ".dds"
 
     cmd = [application_path + path_to_resources + "nvcompress", "-nomips", "-bc1", "-silent", inputfile, outputfile]
     subprocess.call(cmd)
@@ -419,7 +424,7 @@ def set_metadata_texture(height, width, size):
 
 def write_metaData(outputPath):
     global metaData
-    outputPath = outputPath + "/sequence.json"
+    outputPath = get_output_path() + "/sequence.json"
 
     with open(outputPath, 'w') as f:
         json.dump(metaData, f)
@@ -450,6 +455,11 @@ def validate_input_files(input_path):
 
         return True
 
+def get_output_path():
+    if(len(path_to_output_sequence) > 1 and path_to_output_sequence_proposed == ""):
+        return path_to_output_sequence
+    else:
+        return path_to_output_sequence_proposed
 
         
 #----------------------- UI Logic ---------------------------
@@ -473,6 +483,7 @@ def set_input_files(new_input_path):
 
     global input_valid
     global path_to_input_sequence
+    global path_to_output_sequence
 
     input_valid = False
 
@@ -485,7 +496,7 @@ def set_input_files(new_input_path):
 
     if(res == True):
 
-        if(len(path_to_output_sequence) < 1):
+        if(len(path_to_output_sequence) < 1 or path_to_output_sequence == no_path_warning):
             #Re-Initialize the output dialog, so that it goes directly to the input dir path when opening it. 
             dpg.delete_item("file_output_dialog_id")
             dpg.add_file_dialog(directory_selector=True, show=False, callback=output_files_confirm_callback, tag="file_output_dialog_id", min_size=[500, 430], default_path=new_input_path)
@@ -493,6 +504,10 @@ def set_input_files(new_input_path):
         path_to_input_sequence = new_input_path
         dpg.set_value(text_input_Dir_ID, path_to_input_sequence)
         dpg.set_value(text_info_log_ID, "Input files set!")
+
+        # Propose an output dir
+        set_proposed_output_files(path_to_input_sequence)
+
         input_valid = True
         save_config("input", path_to_input_sequence)
         dpg.delete_item("file_input_dialog_id")
@@ -507,11 +522,22 @@ def set_input_files(new_input_path):
 def output_files_confirm_callback(sender, app_data):
     set_output_files(app_data["file_path_name"])
 
+def set_proposed_output_files(input_path):
+    
+    global path_to_output_sequence_proposed
+    global path_to_output_sequence
+
+    if(len(path_to_output_sequence) < 1 or path_to_output_sequence == no_path_warning):
+        path_to_output_sequence_proposed = input_path + "\\converted"
+        dpg.set_value(text_output_Dir_ID, "Proposed path: " + path_to_output_sequence_proposed)
+
+
 
 def set_output_files(new_output_path):
 
     global output_valid
     global path_to_output_sequence
+    global path_to_output_sequence_proposed
 
     output_valid = False
 
@@ -524,7 +550,7 @@ def set_output_files(new_output_path):
         dpg.set_value(text_output_Dir_ID, path_to_output_sequence)
         dpg.set_value(text_info_log_ID, "Output folder set!")
         output_valid = True
-        save_config("output", path_to_output_sequence)
+        path_to_output_sequence_proposed = ""
         dpg.delete_item("file_output_dialog_id")
         dpg.add_file_dialog(directory_selector=True, show=False, callback=output_files_confirm_callback, tag="file_output_dialog_id", min_size=[500, 430], default_path=path_to_output_sequence)
 
@@ -533,10 +559,6 @@ def set_output_files(new_output_path):
         dpg.set_value(text_info_log_ID, "")
         dpg.set_value(text_error_log_ID, "Error: Output directory is not valid!")
         output_valid = False
-
-def copy_input_to_output_dir():
-    global path_to_input_sequence
-    set_output_files(path_to_input_sequence)
 
 def cancel_processing_callback():
     global termination_signal
@@ -557,16 +579,16 @@ def show_output():
         x = "DearPyGui error, nothing to worry about"
 
 def load_config():
+
     global config
 
     #Create config on first starup
     if not (os.path.exists(path_to_config)):
         config['Paths'] = {}
         config['Paths']['input'] = ""
-        config['Paths']['output'] = ""
         with open(path_to_config, "w") as configfile:
             config.write(configfile)
-        print("Writte config first time")
+        print("Written config first time")
     
     config.read(path_to_config)
 
@@ -590,17 +612,13 @@ dpg.setup_dearpygui()
 with dpg.window(label="Geometry Sequence Converter", tag="main_window", min_size= [500, 500]):
     
     dpg.add_file_dialog(directory_selector=True, show=False, callback=input_files_confirm_callback, tag="file_input_dialog_id", min_size=[500, 430], default_path=path_to_input_sequence)
-    dpg.add_file_dialog(directory_selector=True, show=False, callback=output_files_confirm_callback, tag="file_output_dialog_id", min_size=[500, 430], default_path=path_to_output_sequence)
+    dpg.add_file_dialog(directory_selector=True, show=False, callback=output_files_confirm_callback, tag="file_output_dialog_id", min_size=[500, 430], default_path=path_to_input_sequence)
 
     dpg.add_button(label="Select Input Directory", callback=lambda:show_input())
-    #dpg.add_text("Input sequence folder:")
     text_input_Dir_ID = dpg.add_text(path_to_input_sequence, wrap=450)
     dpg.add_spacer(height=50)
 
     dpg.add_button(label="Select Output Directory", callback=lambda:show_output())
-    #dpg.add_text("Output sequence folder:")
-    dpg.add_same_line()
-    dpg.add_button(label="Set to Input Directory", callback=lambda:copy_input_to_output_dir())
     text_output_Dir_ID = dpg.add_text(path_to_output_sequence, wrap=450)
 
     text_error_log_ID = dpg.add_text("", color=[255, 0, 0], wrap=500, pos= [10, 370])
@@ -622,7 +640,6 @@ dpg.set_primary_window("main_window", True)
 config = configparser.ConfigParser()
 load_config()
 set_input_files(read_config("input"))
-set_output_files(read_config("output"))
 
 while dpg.is_dearpygui_running():
 
