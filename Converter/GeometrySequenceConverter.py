@@ -9,6 +9,7 @@ from multiprocessing.pool import ThreadPool
 from threading import Lock
 from threading import Event
 import json
+from enum import IntEnum
 
 ### +++++++++++++++++++++++++  PACKAGE INTO SINGLE EXECUTABLE ++++++++++++++++++++++++++++++++++
 #Use this prompt in the terminal to package this script into a single executable for your system
@@ -56,18 +57,50 @@ max_active_threads = 4
 valid_model_types = ["obj", "3ds", "fbx", "glb", "gltf", "obj", "ply", "ptx", "stl", "xyz", "pts"]
 valid_image_types = ["jpg", "jpeg", "png", "tiff", "dds", "bmp", "tga"]
 
-metaData = {
-    "geometryType" : None,
-    "textureMode" : None,
-    "maxVertexCount": 0,
-    "maxTriangleCount" : 0,
-    "maxBounds" : [0, 0, 0, 0, 0, 0],
-    "textureWidth" : 0,
-    "textureHeight" : 0,
-    "models" : [],
-    "textures" : []
-}
+class GeometryType(IntEnum):
+    point = 0
+    mesh = 1
+    texturedMesh = 2
 
+class TextureMode(IntEnum):
+    none = 0
+    single = 1
+    perFrame = 2
+
+class MetaData():
+    geometryType = GeometryType.point
+    textureMode = TextureMode.none
+    maxVertexCount = 0
+    maxIndiceCount = 0
+    maxBounds = [0,0,0,0,0,0]
+    textureWidth = 0
+    textureHeight = 0
+    textureSize = 0
+    headerSizes = []
+    verticeCounts = []
+    indiceCounts = []
+
+    def get_as_dict(self):
+
+        asDict = {
+            "geometryType" : int(self.geometryType),
+            "textureMode" : int(self.textureMode),
+            "maxVertexCount": self.maxVertexCount,
+            "maxIndiceCount" : self.maxIndiceCount,
+            "maxBounds" : self.maxBounds,
+            "textureWidth" : self.textureWidth,
+            "textureHeight" : self.textureHeight,
+            "textureSize" : self.textureSize,
+            "headerSizes" : self.headerSizes,
+            "verticeCounts" : self.verticeCounts,
+            "indiceCounts" : self.indiceCounts,
+        }
+
+        return asDict
+        
+
+
+metaData = MetaData()
 
 def setup_converter():
 
@@ -100,7 +133,6 @@ def setup_converter():
     total_file_count = len(input_sequence_list_images) + len(input_sequence_list_models)
     
     processed_files = 0
-    dpg.set_value(progress_bar_ID, 1 / total_file_count)
 
     process()
 
@@ -160,7 +192,13 @@ def finish_process():
 def process_models():
 
     global modelPool
-    modelPool = ThreadPool(processes= max_active_threads)
+
+    if(len(input_sequence_list_models) < max_active_threads):
+        threads = len(input_sequence_list_models)
+    else:
+        threads = max_active_threads
+
+    modelPool = ThreadPool(processes= threads)
     modelPool.map_async(convert_model, input_sequence_list_models)
 
 def convert_model(file):
@@ -234,22 +272,24 @@ def convert_model(file):
     vertexCount = len(vertices)
 
     if(faces is not None):
-        triangleCount = len(faces)
+        indiceCount = len(faces) * 3
     else:
-        triangleCount = 0
+        indiceCount = 0
 
     bounds = ms.current_mesh().bounding_box()
 
     if(is_pointcloud == True):
-        geoType = "points"
+        geoType = GeometryType.point
     else:
-        geoType = "mesh"
+        if(has_UVs == False):
+            geoType = GeometryType.mesh
+        else:
+            geoType = GeometryType.texturedMesh
 
     if(termination_signal.is_set()):
         advance_progressbar()
         return
 
-    set_metadata_Model(vertexCount, triangleCount, bounds, geoType)
     
     #The meshlab exporter doesn't support all the features we need, so we export the files manually
     #to PLY with our very stringent structure. This is needed because we want to keep the
@@ -283,7 +323,10 @@ def convert_model(file):
 
         header += "end_header\n"
 
-        f.write(header.encode('ascii'))
+        headerASCII = header.encode('ascii')
+        headerSize = len(headerASCII)
+
+        f.write(headerASCII)
 
 
         #Constructing the mesh data, as binary
@@ -333,6 +376,8 @@ def convert_model(file):
 
         f.write(bytes(body))
 
+    set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geoType)
+
     advance_progressbar()    
 
 def process_images():
@@ -375,31 +420,32 @@ def convert_image(file):
     set_metadata_texture(width, height, size)
 
 
-def set_metadata_Model(vertexCount, triangleCount, bounds, geometryType):
+def set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geometryType):
     
     global metaDataLock
     global metaData
 
     metaDataLock.acquire()
 
-    if(metaData["geometryType"] is None):
-        metaData["geometryType"] = geometryType
+    metaData.geometryType = geometryType
 
-    if(vertexCount > metaData["maxVertexCount"]):
-        metaData["maxVertexCount"] = vertexCount
+    if(vertexCount > metaData.maxVertexCount):
+        metaData.maxVertexCount = vertexCount
 
-    if(triangleCount > metaData["maxTriangleCount"]):
-        metaData["maxTriangleCount"] = triangleCount
+    if(indiceCount > metaData.maxIndiceCount):
+        metaData.maxIndiceCount = indiceCount
 
     for maxBound in range(3):
-        if metaData["maxBounds"][maxBound] < bounds.max()[maxBound]:
-            metaData["maxBounds"][maxBound] = bounds.max()[maxBound]
+        if metaData.maxBounds[maxBound] < bounds.max()[maxBound]:
+            metaData.maxBounds[maxBound] = bounds.max()[maxBound]
 
     for minBound in range(3):
-        if metaData["maxBounds"][minBound + 3] > bounds.min()[minBound]:
-            metaData["maxBounds"][minBound + 3] = bounds.min()[minBound]
+        if metaData.maxBounds[minBound + 3] > bounds.min()[minBound]:
+            metaData.maxBounds[minBound + 3] = bounds.min()[minBound]
 
-    metaData["models"].append((vertexCount, triangleCount))
+    metaData.headerSizes.append(headerSize)
+    metaData.verticeCounts.append(vertexCount)
+    metaData.indiceCounts.append(indiceCount)
 
     metaDataLock.release()
 
@@ -410,13 +456,14 @@ def set_metadata_texture(height, width, size):
 
     metaDataLock.acquire()
 
-    if(height > metaData["height"]):
-        metaData["height"] = height
+    if(height > metaData.textureHeight):
+        metaData.textureHeight = height
     
-    if(width > metaData["width"]):
-        metaData["width"] = width
+    if(width > metaData.textureWidth):
+        metaData.textureWidth = width
     
-    metaData["textures"].append(size)
+    if(size > metaData.textureSize):
+        metaData.textureSize = size
 
     metaDataLock.release()
 
@@ -426,8 +473,10 @@ def write_metaData(outputPath):
     global metaData
     outputPath = get_output_path() + "/sequence.json"
 
+    content = metaData.get_as_dict()
+
     with open(outputPath, 'w') as f:
-        json.dump(metaData, f)
+        json.dump(content, f)    
 
 def validate_input_files(input_path):
 
