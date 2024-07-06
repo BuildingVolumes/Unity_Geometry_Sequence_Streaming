@@ -70,6 +70,7 @@ class TextureMode(IntEnum):
 class MetaData():
     geometryType = GeometryType.point
     textureMode = TextureMode.none
+    hasUVs = False
     maxVertexCount = 0
     maxIndiceCount = 0
     maxBounds = [0,0,0,0,0,0]
@@ -85,6 +86,7 @@ class MetaData():
         asDict = {
             "geometryType" : int(self.geometryType),
             "textureMode" : int(self.textureMode),
+            "hasUVs" : self.hasUVs,
             "maxVertexCount": self.maxVertexCount,
             "maxIndiceCount" : self.maxIndiceCount,
             "maxBounds" : self.maxBounds,
@@ -127,7 +129,8 @@ def setup_converter():
         return False
     
     if(output_valid == False and len(path_to_output_sequence) > 1 ):
-        os.mkdir(path_to_output_sequence_proposed)
+        if not (os.path.exists(path_to_output_sequence_proposed)):
+            os.mkdir(path_to_output_sequence_proposed)
 
     max_active_threads= dpg.get_value("threadCount")
     total_file_count = len(input_sequence_list_images) + len(input_sequence_list_models)
@@ -178,10 +181,12 @@ def finish_process():
     global texturePool
 
     write_metaData(path_to_output_sequence)
-    dpg.set_value(text_info_log_ID, "Finished!")
 
     if(termination_signal.is_set()):
         dpg.set_value(text_info_log_ID, "Canceled!")
+    else:
+        write_metaData(path_to_output_sequence)
+        dpg.set_value(text_info_log_ID, "Finished!")
     
     dpg.set_value(progress_bar_ID, 0)
 
@@ -219,7 +224,14 @@ def convert_model(file):
 
     ms = ml.MeshSet()
 
-    ms.load_new_mesh(inputfile)
+    try:
+        ms.load_new_mesh(inputfile)
+    except:
+        print("Could not load file: " + inputfile)
+        termination_signal.set()
+        dpg.set_value(text_error_log_ID, "Error opening file: " + inputfile)
+        advance_progressbar()
+        return    
 
     if(termination_signal.is_set()):
         advance_progressbar()
@@ -363,12 +375,11 @@ def convert_model(file):
                 if(has_UVs == True):
                     body.extend(uvRaw[index * 2 * 4:(index * 2 * 4) + 8])
 
-            for index, line in enumerate(faces):
-                
+            for index, line in enumerate(faces):                
                 #For PLY files, each indice bundle has to mention how much indices it contains
                 #As we only have triangular faces, it will always be three
-                indiceCount = [3]
-                body.extend(bytes(indiceCount))
+                indiceArray = [3]
+                body.extend(bytes(indiceArray))
 
                 #Copy three UInt32s as face indices
                 body.extend(faceRaw[index * 3 * 4: (index * 3 * 4) + 12])
@@ -376,7 +387,7 @@ def convert_model(file):
 
         f.write(bytes(body))
 
-    set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geoType)
+    set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geoType, has_UVs)
 
     advance_progressbar()    
 
@@ -420,7 +431,7 @@ def convert_image(file):
     set_metadata_texture(width, height, size)
 
 
-def set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geometryType):
+def set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geometryType, hasUV):
     
     global metaDataLock
     global metaData
@@ -428,6 +439,7 @@ def set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geometryTyp
     metaDataLock.acquire()
 
     metaData.geometryType = geometryType
+    metaData.hasUVs = hasUV
 
     if(vertexCount > metaData.maxVertexCount):
         metaData.maxVertexCount = vertexCount
