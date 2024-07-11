@@ -10,6 +10,8 @@ from threading import Lock
 from threading import Event
 import json
 from enum import IntEnum
+from tkinter import Tk     # from tkinter import Tk for Python 3.x
+from tkinter.filedialog import askdirectory
 
 ### +++++++++++++++++++++++++  PACKAGE INTO SINGLE EXECUTABLE ++++++++++++++++++++++++++++++++++
 #Use this prompt in the terminal to package this script into a single executable for your system
@@ -52,7 +54,7 @@ texturePool = None
 
 processed_files = 0
 total_file_count = 0
-max_active_threads = 4
+max_active_threads = 8
 
 valid_model_types = ["obj", "3ds", "fbx", "glb", "gltf", "obj", "ply", "ptx", "stl", "xyz", "pts"]
 valid_image_types = ["jpg", "jpeg", "png", "tiff", "dds", "bmp", "tga"]
@@ -106,14 +108,14 @@ metaData = MetaData()
 
 def setup_converter():
 
+    global is_running
+    if(is_running):
+        return
+
     global processed_files
     global total_file_count
     global max_active_threads
-    global termination_signal
-    global is_running
-
-    if(is_running):
-        return
+    global termination_signal    
 
     termination_signal.clear()
 
@@ -167,11 +169,13 @@ def advance_progressbar():
     else:
         dpg.set_value(progress_bar_ID, 1)
         dpg.set_value(text_info_log_ID, "Canceling...")
-
-    progressbarLock.release()
+        print("Canceling")
 
     if(processed_files == total_file_count):
         finish_process()
+
+    progressbarLock.release()
+
 
 def finish_process():
 
@@ -180,7 +184,7 @@ def finish_process():
     global modelPool
     global texturePool
 
-    write_metaData(path_to_output_sequence)
+    print("Finishing")
 
     if(termination_signal.is_set()):
         dpg.set_value(text_info_log_ID, "Canceled!")
@@ -190,9 +194,26 @@ def finish_process():
     
     dpg.set_value(progress_bar_ID, 0)
 
-    modelPool.close()
-    texturePool.close()
+    print("Closing threadpool")
+    
+    waitOnClose = True
+    while(waitOnClose):
+        try:
+            waitOnClose = False
+            modelPool.close()
+        except:
+            waitOnClose = True
+    
+    waitOnClose = True
+    while(waitOnClose):
+        try:
+            waitOnClose = False
+            texturePool.close()
+        except:
+            waitOnClose = True
+
     is_running = False
+    print("Finished")
 
 def process_models():
 
@@ -399,7 +420,6 @@ def process_images():
 
 def convert_image(file):
 
-    global last_image_path
     global termination_signal
 
     if(termination_signal.is_set()):
@@ -420,7 +440,7 @@ def convert_image(file):
     width = -1
 
     # We don't need to do this for every file, just the first one
-    if(metaData["height"] == 0 or metaData["width"] == 0):
+    if(metaData.textureHeight == 0 or metaData.textureWidth == 0):
         with open(outputfile, mode='rb') as file: # b is important -> binary
             fileContent = file.read()
             height = fileContent[13] * 256 + fileContent[12]
@@ -428,7 +448,14 @@ def convert_image(file):
 
     size = os.path.getsize(outputfile) - 128
 
-    set_metadata_texture(width, height, size)
+    if(len(input_sequence_list_images) == 1):
+        textureMode = TextureMode.single
+    if(len(input_sequence_list_images) > 1):
+        textureMode = TextureMode.perFrame
+
+    set_metadata_texture(width, height, size, textureMode)
+
+    advance_progressbar()
 
 
 def set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geometryType, hasUV):
@@ -461,7 +488,7 @@ def set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geometryTyp
 
     metaDataLock.release()
 
-def set_metadata_texture(height, width, size):
+def set_metadata_texture(height, width, size, textureMode):
 
     global metaDataLock
     global metaData
@@ -476,6 +503,8 @@ def set_metadata_texture(height, width, size):
     
     if(size > metaData.textureSize):
         metaData.textureSize = size
+
+    metaData.textureMode = textureMode
 
     metaDataLock.release()
 
@@ -533,12 +562,32 @@ text_error_log_ID = 0
 text_info_log_ID = 0
 progress_bar_ID = 0
 
-
-dpg.create_context()
-
 def input_files_confirm_callback(sender, app_data):
     set_input_files(app_data["file_path_name"])
 
+def open_file_dialog(path):
+    Tk().withdraw() # we don't want a full GUI, so keep the root window from appearing
+    
+    if(path is None):
+        new_input_path = askdirectory() 
+    else:
+        new_input_path = askdirectory(initialdir=path, )
+
+    return new_input_path
+
+def open_input_dir():
+
+    selectedDir = open_file_dialog(path_to_input_sequence)
+    set_input_files(selectedDir)
+
+def open_output_dir():
+
+    if(path_to_output_sequence is None or len(path_to_output_sequence) < 1):
+        selectedDir = open_file_dialog(path_to_input_sequence)
+    else:
+        selectedDir = open_file_dialog(path_to_output_sequence)
+    
+    set_output_files(selectedDir)
 
 def set_input_files(new_input_path):
 
@@ -555,13 +604,8 @@ def set_input_files(new_input_path):
 
     res = validate_input_files(new_input_path)
 
+
     if(res == True):
-
-        if(len(path_to_output_sequence) < 1 or path_to_output_sequence == no_path_warning):
-            #Re-Initialize the output dialog, so that it goes directly to the input dir path when opening it. 
-            dpg.delete_item("file_output_dialog_id")
-            dpg.add_file_dialog(directory_selector=True, show=False, callback=output_files_confirm_callback, tag="file_output_dialog_id", min_size=[500, 430], default_path=new_input_path)
-
         path_to_input_sequence = new_input_path
         dpg.set_value(text_input_Dir_ID, path_to_input_sequence)
         dpg.set_value(text_info_log_ID, "Input files set!")
@@ -571,12 +615,8 @@ def set_input_files(new_input_path):
 
         input_valid = True
         save_config("input", path_to_input_sequence)
-        dpg.delete_item("file_input_dialog_id")
-        dpg.add_file_dialog(directory_selector=True, show=False, callback=input_files_confirm_callback, tag="file_input_dialog_id", min_size=[500, 430], default_path=path_to_input_sequence)       
-
+         
     else:
-        path_to_input_sequence = ""
-        input_valid = False
         dpg.set_value(text_info_log_ID, "")
         dpg.set_value(text_error_log_ID, res)
 
@@ -605,39 +645,20 @@ def set_output_files(new_output_path):
     dpg.set_value(text_info_log_ID, "")
     dpg.set_value(text_error_log_ID, "")
 
-
     if(os.path.exists(new_output_path) == True):
         path_to_output_sequence = new_output_path
         dpg.set_value(text_output_Dir_ID, path_to_output_sequence)
         dpg.set_value(text_info_log_ID, "Output folder set!")
         output_valid = True
         path_to_output_sequence_proposed = ""
-        dpg.delete_item("file_output_dialog_id")
-        dpg.add_file_dialog(directory_selector=True, show=False, callback=output_files_confirm_callback, tag="file_output_dialog_id", min_size=[500, 430], default_path=path_to_output_sequence)
 
     else:
-        path_to_output_sequence = ""
         dpg.set_value(text_info_log_ID, "")
         dpg.set_value(text_error_log_ID, "Error: Output directory is not valid!")
-        output_valid = False
 
 def cancel_processing_callback():
     global termination_signal
     termination_signal.set()
-
-def show_input():
-    dpg.show_item("file_input_dialog_id")
-    try:
-        dpg.set_item_pos(item="file_input_dialog_id", pos=[0,0])
-    except:
-        x = "DearPyGui error, nothing to worry about"
-
-def show_output():
-    dpg.show_item("file_output_dialog_id")
-    try:
-        dpg.set_item_pos(item="file_output_dialog_id", pos=[0,0])
-    except:
-        x = "DearPyGui error, nothing to worry about"
 
 def load_config():
 
@@ -665,21 +686,18 @@ def save_config(key, value):
 
 
 # Main UI Loop
-
+dpg.create_context()
+dpg.configure_app(manual_callback_management=True)
 dpg.create_viewport(height=500, width=500, title="Geometry Sequence Converter")
 dpg.setup_dearpygui()
 
-
 with dpg.window(label="Geometry Sequence Converter", tag="main_window", min_size= [500, 500]):
-    
-    dpg.add_file_dialog(directory_selector=True, show=False, callback=input_files_confirm_callback, tag="file_input_dialog_id", min_size=[500, 430], default_path=path_to_input_sequence)
-    dpg.add_file_dialog(directory_selector=True, show=False, callback=output_files_confirm_callback, tag="file_output_dialog_id", min_size=[500, 430], default_path=path_to_input_sequence)
 
-    dpg.add_button(label="Select Input Directory", callback=lambda:show_input())
+    dpg.add_button(label="Select Input Directory", callback=lambda:open_input_dir())
     text_input_Dir_ID = dpg.add_text(path_to_input_sequence, wrap=450)
     dpg.add_spacer(height=50)
 
-    dpg.add_button(label="Select Output Directory", callback=lambda:show_output())
+    dpg.add_button(label="Select Output Directory", callback=lambda:open_output_dir())
     text_output_Dir_ID = dpg.add_text(path_to_output_sequence, wrap=450)
 
     text_error_log_ID = dpg.add_text("", color=[255, 0, 0], wrap=500, pos= [10, 370])
@@ -692,7 +710,7 @@ with dpg.window(label="Geometry Sequence Converter", tag="main_window", min_size
     dpg.add_same_line()
     dpg.add_button(label="Cancel", callback=lambda:cancel_processing_callback())
     dpg.add_same_line()
-    dpg.add_input_int(label="Thread count", default_value=4, min_value=0, max_value=128, width=100, tag="threadCount")
+    dpg.add_input_int(label="Thread count", default_value=8, min_value=0, max_value=256, width=100, tag="threadCount")
 
 
 dpg.show_viewport()
@@ -703,8 +721,9 @@ load_config()
 set_input_files(read_config("input"))
 
 while dpg.is_dearpygui_running():
-
     dpg.render_dearpygui_frame()
+    jobs = dpg.get_callback_queue()
+    dpg.run_callbacks(jobs)
 
 # Shutdown threads when they are still running
 cancel_processing_callback()
