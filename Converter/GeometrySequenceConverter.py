@@ -2,16 +2,13 @@ import os
 import sys
 import subprocess
 import pymeshlab as ml
-import dearpygui.dearpygui as dpg
 import numpy as np
 import configparser
 from multiprocessing.pool import ThreadPool
 from threading import Lock
 from threading import Event
-import json
-from enum import IntEnum
-from tkinter import Tk     # from tkinter import Tk for Python 3.x
-from tkinter.filedialog import askdirectory
+import Sequence_Metadata
+
 
 ### +++++++++++++++++++++++++  PACKAGE INTO SINGLE EXECUTABLE ++++++++++++++++++++++++++++++++++
 #Use this prompt in the terminal to package this script into a single executable for your system
@@ -37,6 +34,8 @@ path_to_output_sequence = no_path_warning
 path_to_output_sequence_proposed = ""
 last_image_path = ""
 last_model_path = ""
+generate_DDS = True
+generate_ATSC = True
 
 input_sequence_list_models = []
 input_sequence_list_images = []
@@ -46,7 +45,7 @@ is_pointcloud = False
 input_valid = False
 output_valid = False
 
-metaDataLock = Lock()
+metaData = Sequence_Metadata.MetaData()
 progressbarLock = Lock()
 termination_signal = Event()
 modelPool = None
@@ -59,54 +58,10 @@ max_active_threads = 8
 valid_model_types = ["obj", "3ds", "fbx", "glb", "gltf", "obj", "ply", "ptx", "stl", "xyz", "pts"]
 valid_image_types = ["jpg", "jpeg", "png", "tiff", "dds", "bmp", "tga"]
 
-class GeometryType(IntEnum):
-    point = 0
-    mesh = 1
-    texturedMesh = 2
-
-class TextureMode(IntEnum):
-    none = 0
-    single = 1
-    perFrame = 2
-
-class MetaData():
-    geometryType = GeometryType.point
-    textureMode = TextureMode.none
-    hasUVs = False
-    maxVertexCount = 0
-    maxIndiceCount = 0
-    maxBounds = [0,0,0,0,0,0]
-    textureWidth = 0
-    textureHeight = 0
-    textureSize = 0
-    headerSizes = []
-    verticeCounts = []
-    indiceCounts = []
-
-    def get_as_dict(self):
-
-        asDict = {
-            "geometryType" : int(self.geometryType),
-            "textureMode" : int(self.textureMode),
-            "hasUVs" : self.hasUVs,
-            "maxVertexCount": self.maxVertexCount,
-            "maxIndiceCount" : self.maxIndiceCount,
-            "maxBounds" : self.maxBounds,
-            "textureWidth" : self.textureWidth,
-            "textureHeight" : self.textureHeight,
-            "textureSize" : self.textureSize,
-            "headerSizes" : self.headerSizes,
-            "verticeCounts" : self.verticeCounts,
-            "indiceCounts" : self.indiceCounts,
-        }
-
-        return asDict
-        
 
 
-metaData = MetaData()
 
-def setup_converter():
+def setup_converter_cb():
 
     global is_running
     if(is_running):
@@ -134,8 +89,20 @@ def setup_converter():
         if not (os.path.exists(path_to_output_sequence_proposed)):
             os.mkdir(path_to_output_sequence_proposed)
 
+    modelCount = len(input_sequence_list_models)
+    textureCount = len(input_sequence_list_images)
+    total_file_count =  modelCount + textureCount
+
+
+    if(textureCount > 1 and modelCount != textureCount):
+        dpg.set_value(text_error_log_ID, "You need to either supply one texture per frame, or one texture for the whole sequence")
+        return False
+
+    metaData.headerSizes = [None] * modelCount
+    metaData.verticeCounts = [None] * modelCount
+    metaData.indiceCounts = [None] * modelCount
+
     max_active_threads= dpg.get_value("threadCount")
-    total_file_count = len(input_sequence_list_images) + len(input_sequence_list_models)
     
     processed_files = 0
 
@@ -183,13 +150,14 @@ def finish_process():
     global termination_signal
     global modelPool
     global texturePool
+    global metaData
 
     print("Finishing")
 
     if(termination_signal.is_set()):
         dpg.set_value(text_info_log_ID, "Canceled!")
     else:
-        write_metaData(path_to_output_sequence)
+        metaData.write_metaData(path_to_output_sequence)
         dpg.set_value(text_info_log_ID, "Finished!")
     
     dpg.set_value(progress_bar_ID, 0)
@@ -231,6 +199,9 @@ def convert_model(file):
 
     global is_pointcloud
     global termination_signal
+    global metaData
+
+    listIndex = input_sequence_list_models.index(file)
 
     if(termination_signal.is_set()):
         advance_progressbar()
@@ -312,12 +283,12 @@ def convert_model(file):
     bounds = ms.current_mesh().bounding_box()
 
     if(is_pointcloud == True):
-        geoType = GeometryType.point
+        geoType = Sequence_Metadata.GeometryType.point
     else:
         if(has_UVs == False):
-            geoType = GeometryType.mesh
+            geoType = Sequence_Metadata.GeometryType.mesh
         else:
-            geoType = GeometryType.texturedMesh
+            geoType = Sequence_Metadata.GeometryType.texturedMesh
 
     if(termination_signal.is_set()):
         advance_progressbar()
@@ -408,7 +379,7 @@ def convert_model(file):
 
         f.write(bytes(body))
 
-    set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geoType, has_UVs)
+    metaData.set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geoType, has_UVs, listIndex)
 
     advance_progressbar()    
 
@@ -433,8 +404,8 @@ def convert_image(file):
     inputfile = path_to_input_sequence + "\\"+ file
     outputfile =  get_output_path() + "\\" + file_name + ".dds"
 
-    cmd = [application_path + path_to_resources + "nvcompress", "-nomips", "-bc1", "-silent", inputfile, outputfile]
-    subprocess.call(cmd)
+    cmd = application_path + path_to_resources + "texconv -m 1 -f DXT1 -y -srgb " + inputfile + " -o " + get_output_path()
+    subprocess.run(cmd)
 
     height = -1
     width = -1
@@ -449,75 +420,14 @@ def convert_image(file):
     size = os.path.getsize(outputfile) - 128
 
     if(len(input_sequence_list_images) == 1):
-        textureMode = TextureMode.single
+        textureMode = Sequence_Metadata.TextureMode.single
     if(len(input_sequence_list_images) > 1):
-        textureMode = TextureMode.perFrame
+        textureMode = Sequence_Metadata.TextureMode.perFrame
 
-    set_metadata_texture(width, height, size, textureMode)
+    metaData.set_metadata_texture(width, height, size, textureMode)
 
     advance_progressbar()
 
-
-def set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geometryType, hasUV):
-    
-    global metaDataLock
-    global metaData
-
-    metaDataLock.acquire()
-
-    metaData.geometryType = geometryType
-    metaData.hasUVs = hasUV
-
-    if(vertexCount > metaData.maxVertexCount):
-        metaData.maxVertexCount = vertexCount
-
-    if(indiceCount > metaData.maxIndiceCount):
-        metaData.maxIndiceCount = indiceCount
-
-    for maxBound in range(3):
-        if metaData.maxBounds[maxBound] < bounds.max()[maxBound]:
-            metaData.maxBounds[maxBound] = bounds.max()[maxBound]
-
-    for minBound in range(3):
-        if metaData.maxBounds[minBound + 3] > bounds.min()[minBound]:
-            metaData.maxBounds[minBound + 3] = bounds.min()[minBound]
-
-    metaData.headerSizes.append(headerSize)
-    metaData.verticeCounts.append(vertexCount)
-    metaData.indiceCounts.append(indiceCount)
-
-    metaDataLock.release()
-
-def set_metadata_texture(height, width, size, textureMode):
-
-    global metaDataLock
-    global metaData
-
-    metaDataLock.acquire()
-
-    if(height > metaData.textureHeight):
-        metaData.textureHeight = height
-    
-    if(width > metaData.textureWidth):
-        metaData.textureWidth = width
-    
-    if(size > metaData.textureSize):
-        metaData.textureSize = size
-
-    metaData.textureMode = textureMode
-
-    metaDataLock.release()
-
-
-
-def write_metaData(outputPath):
-    global metaData
-    outputPath = get_output_path() + "/sequence.json"
-
-    content = metaData.get_as_dict()
-
-    with open(outputPath, 'w') as f:
-        json.dump(content, f)    
 
 def validate_input_files(input_path):
 
@@ -550,190 +460,3 @@ def get_output_path():
         return path_to_output_sequence
     else:
         return path_to_output_sequence_proposed
-
-        
-#----------------------- UI Logic ---------------------------
-
-
-#UI IDs for the DearPyGUI
-text_input_Dir_ID = 0
-text_output_Dir_ID = 0
-text_error_log_ID = 0
-text_info_log_ID = 0
-progress_bar_ID = 0
-
-def input_files_confirm_callback(sender, app_data):
-    set_input_files(app_data["file_path_name"])
-
-def open_file_dialog(path):
-    Tk().withdraw() # we don't want a full GUI, so keep the root window from appearing
-    
-    if(path is None):
-        new_input_path = askdirectory() 
-    else:
-        new_input_path = askdirectory(initialdir=path, )
-
-    return new_input_path
-
-def open_input_dir():
-
-    selectedDir = open_file_dialog(path_to_input_sequence)
-    set_input_files(selectedDir)
-
-def open_output_dir():
-
-    if(path_to_output_sequence is None or len(path_to_output_sequence) < 1):
-        selectedDir = open_file_dialog(path_to_input_sequence)
-    else:
-        selectedDir = open_file_dialog(path_to_output_sequence)
-    
-    set_output_files(selectedDir)
-
-def set_input_files(new_input_path):
-
-    global input_valid
-    global path_to_input_sequence
-    global path_to_output_sequence
-
-    input_valid = False
-
-    dpg.set_value(text_error_log_ID, "")
-
-    input_sequence_list_images.clear()
-    input_sequence_list_models.clear()
-
-    res = validate_input_files(new_input_path)
-
-
-    if(res == True):
-        path_to_input_sequence = new_input_path
-        dpg.set_value(text_input_Dir_ID, path_to_input_sequence)
-        dpg.set_value(text_info_log_ID, "Input files set!")
-
-        # Propose an output dir
-        set_proposed_output_files(path_to_input_sequence)
-
-        input_valid = True
-        save_config("input", path_to_input_sequence)
-         
-    else:
-        dpg.set_value(text_info_log_ID, "")
-        dpg.set_value(text_error_log_ID, res)
-
-def output_files_confirm_callback(sender, app_data):
-    set_output_files(app_data["file_path_name"])
-
-def set_proposed_output_files(input_path):
-    
-    global path_to_output_sequence_proposed
-    global path_to_output_sequence
-
-    if(len(path_to_output_sequence) < 1 or path_to_output_sequence == no_path_warning):
-        path_to_output_sequence_proposed = input_path + "\\converted"
-        dpg.set_value(text_output_Dir_ID, "Proposed path: " + path_to_output_sequence_proposed)
-
-
-
-def set_output_files(new_output_path):
-
-    global output_valid
-    global path_to_output_sequence
-    global path_to_output_sequence_proposed
-
-    output_valid = False
-
-    dpg.set_value(text_info_log_ID, "")
-    dpg.set_value(text_error_log_ID, "")
-
-    if(os.path.exists(new_output_path) == True):
-        path_to_output_sequence = new_output_path
-        dpg.set_value(text_output_Dir_ID, path_to_output_sequence)
-        dpg.set_value(text_info_log_ID, "Output folder set!")
-        output_valid = True
-        path_to_output_sequence_proposed = ""
-
-    else:
-        dpg.set_value(text_info_log_ID, "")
-        dpg.set_value(text_error_log_ID, "Error: Output directory is not valid!")
-
-def cancel_processing_callback():
-    global termination_signal
-    termination_signal.set()
-
-def load_config():
-
-    global config
-
-    #Create config on first starup
-    if not (os.path.exists(path_to_config)):
-        config['Paths'] = {}
-        config['Paths']['input'] = ""
-        with open(path_to_config, "w") as configfile:
-            config.write(configfile)
-        print("Written config first time")
-    
-    config.read(path_to_config)
-
-def read_config(key):
-    global config
-    return config['Paths'][key]
-
-def save_config(key, value):
-    global config 
-    config['Paths'][key] = value
-    with open(path_to_config, "w") as configfile:
-            config.write(configfile)
-
-
-# Main UI Loop
-dpg.create_context()
-dpg.configure_app(manual_callback_management=True)
-dpg.create_viewport(height=500, width=500, title="Geometry Sequence Converter")
-dpg.setup_dearpygui()
-
-with dpg.window(label="Geometry Sequence Converter", tag="main_window", min_size= [500, 500]):
-
-    dpg.add_button(label="Select Input Directory", callback=lambda:open_input_dir())
-    text_input_Dir_ID = dpg.add_text(path_to_input_sequence, wrap=450)
-    dpg.add_spacer(height=50)
-
-    dpg.add_button(label="Select Output Directory", callback=lambda:open_output_dir())
-    text_output_Dir_ID = dpg.add_text(path_to_output_sequence, wrap=450)
-
-    text_error_log_ID = dpg.add_text("", color=[255, 0, 0], wrap=500, pos= [10, 370])
-    dpg.add_same_line()
-    text_info_log_ID = dpg.add_text("", color=[255, 255, 255], wrap=500)
-
-    progress_bar_ID = dpg.add_progress_bar(default_value=0, width=470)
-    dpg.add_spacer(height=5)
-    dpg.add_button(label="Start Conversion", callback=lambda:setup_converter())
-    dpg.add_same_line()
-    dpg.add_button(label="Cancel", callback=lambda:cancel_processing_callback())
-    dpg.add_same_line()
-    dpg.add_input_int(label="Thread count", default_value=8, min_value=0, max_value=256, width=100, tag="threadCount")
-
-
-dpg.show_viewport()
-dpg.set_primary_window("main_window", True)
-
-config = configparser.ConfigParser()
-load_config()
-set_input_files(read_config("input"))
-
-while dpg.is_dearpygui_running():
-    dpg.render_dearpygui_frame()
-    jobs = dpg.get_callback_queue()
-    dpg.run_callbacks(jobs)
-
-# Shutdown threads when they are still running
-cancel_processing_callback()
-
-if(modelPool is not None):
-    modelPool.close()
-    modelPool.join()
-
-if(texturePool is not None):
-    texturePool.close()
-    texturePool.join()
-
-dpg.destroy_context()
