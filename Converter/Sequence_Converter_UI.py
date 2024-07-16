@@ -1,10 +1,12 @@
 import os
 import sys
 import configparser
+from threading import Event
+from threading import Lock
 from tkinter import Tk     # from tkinter import Tk for Python 3.x
 from tkinter.filedialog import askdirectory
 import dearpygui.dearpygui as dpg
-import Sequence_Converter
+from Sequence_Converter import SequenceConverter
 
 class ConverterUI:
 
@@ -14,64 +16,66 @@ class ConverterUI:
     text_error_log_ID = 0
     text_info_log_ID = 0
     progress_bar_ID = 0
+    thread_count_ID = 0
 
     ### +++++++++++++++++++++++++  PACKAGE INTO SINGLE EXECUTABLE ++++++++++++++++++++++++++++++++++
     #Use this prompt in the terminal to package this script into a single executable for your system
     #You need to have PyInstaller installed in your local environment
     # pyinstaller SequenceConverter_UI.py --collect-all=pymeshlab --icon=resources/logo.ico -F 
 
-    # determine if application is a script file or frozen exe and get the executable path
-    if getattr(sys, 'frozen', False):
-        application_path = os.path.dirname(sys.executable)
-    elif __file__:
-        application_path = os.path.dirname(__file__)
-
-    application_path += "\\"
-
-    path_to_resources = "resources\\"
-    path_to_config = application_path + path_to_resources + "config.ini"
-    config = None
     isRunning = False
-    processed_files = 0
+    conversionEnded = False
+    inputPathValid = False
+    outputPathValid = False
+    processedFileCount = 0
+    totalFileCount = 0
 
-    no_path_warning = "[No folder set]"
-    path_to_input_sequence = no_path_warning
-    path_to_output_sequence = no_path_warning
-    path_to_output_sequence_proposed = ""
-    last_image_path = ""
-    last_model_path = ""
-    input_sequence_list_models = []
-    input_sequence_list_images = []
-    generate_DDS = True
-    generate_ATSC = True
+    applicationPath = ""
+    configPath = ""
+    resourcesPath = ""
+    noPathWarning = "[No folder set]"
+    inputSequencePath = noPathWarning
+    outputSequencePath = noPathWarning
+    proposedOutputPath = ""
 
-    valid_model_types = ["obj", "3ds", "fbx", "glb", "gltf", "obj", "ply", "ptx", "stl", "xyz", "pts"]
-    valid_image_types = ["jpg", "jpeg", "png", "tiff", "dds", "bmp", "tga"]
+    modelPathList = []
+    imagePathList = []
+    generateDDS = True
+    generateASTC = True
 
-    converter = Sequence_Converter.SequenceConverter()
+    validModelTypes = ["obj", "3ds", "fbx", "glb", "gltf", "obj", "ply", "ptx", "stl", "xyz", "pts"]
+    validImageTypes = ["jpg", "jpeg", "png", "dds", "bmp", "tga"]
+    invalidImageTypes = [".dds", ".atsc"]
+
+    converter = SequenceConverter()
+    terminationSignal = Event()
+    progressbarLock = Lock()
+
 
     # --- UI Callbacks ---
-
     def open_input_dir_cb(self):
-        selectedDir = self.open_file_dialog(self.path_to_input_sequence)
+        selectedDir = self.open_file_dialog(self.inputSequencePath)
         self.set_input_files(selectedDir)
 
     def open_output_dir_cb(self):
-        if(self.path_to_output_sequence is None or len(self.path_to_output_sequence) < 1):
-            selectedDir = self.open_file_dialog(self.path_to_input_sequence)
+        if(self.outputSequencePath is None or len(self.outputSequencePath) < 1):
+            selectedDir = self.open_file_dialog(self.inputSequencePath)
         else:
-            selectedDir = self.open_file_dialog(self.path_to_output_sequence)
+            selectedDir = self.open_file_dialog(self.outputSequencePath)
         
         self.set_output_files(selectedDir)
 
     def cancel_processing_cb(self):
-        self.termination_signal.set()
+        self.terminationSignal.set()
+        self.converter.terminate_conversion()
 
     def set_DDS_enabled_cb(self, sender, app_data):
-        self.generate_DDS = app_data
+        self.generateDDS = app_data
+        self.write_config_bool("DDS", app_data)
 
-    def set_ATSC_enabled_cb(self, sender, app_data):
-        self.generate_ATSC = app_data
+    def set_ASTC_enabled_cb(self, sender, app_data):
+        self.generateASTC = app_data
+        self.write_config_bool("ASTC", app_data)
 
     def start_conversion_cb(self):
 
@@ -79,36 +83,56 @@ class ConverterUI:
             return
         
         self.isRunning = True
-        self.termination_signal.clear()
+        self.conversionEnded = False
+        self.terminationSignal.clear()
 
         self.info_text_clear()
         self.error_text_clear()
 
-        if(self.input_valid == False):
+        if(self.inputPathValid == False):
             self.error_text_set("Input files are not configured correctly")
             return False
 
-        if(self.output_valid == False and self.path_to_output_sequence_proposed == "" ):
+        if(self.outputPathValid == False and self.proposedOutputPath == "" ):
             self.error_text_set("Output folder is not configured correctly")
             return False
         
-        if(len(self.input_sequence_list_images) > 1 and len(self.input_sequence_list_models) != len(self.input_sequence_list_images)):
+        if(len(self.imagePathList) > 1 and len(self.modelPathList) != len(self.imagePathList)):
             self.error_text_set("You need to either supply one texture per frame, or one texture for the whole sequence")
             return False
 
-        if(self.output_valid == False and len(self.path_to_output_sequence) > 1 ):
-            if not (os.path.exists(self.path_to_output_sequence_proposed)):
-                os.mkdir(self.path_to_output_sequence_proposed)
+        if(self.outputPathValid == False and len(self.outputSequencePath) > 1 ):
+            if not (os.path.exists(self.proposedOutputPath)):
+                os.mkdir(self.proposedOutputPath)
 
-        self.processed_files = 0
-        self.converter.start_conversion()
+        self.totalFileCount =  len(self.modelPathList) + len(self.imagePathList)
+        self.processedFileCount = 0
+        self.converter.start_conversion(self.modelPathList, self.imagePathList, self.inputSequencePath, self.get_output_path(), self.resourcesPath, self.single_conversion_finished_cb, dpg.get_value(self.thread_count_ID), self.generateDDS, self.generateASTC)
 
         self.info_text_set("Converting...")
         self.set_progressbar(0)
 
+    def single_conversion_finished_cb(self, error, errorText):
+        self.advance_progressbar(error, errorText)
+
+
     # --- File Handeling ---
 
-    def open_file_dialog(path):
+    def InitDefaultPaths(self):
+    
+        # determine if application is a script file or frozen exe and get the executable path
+        if getattr(sys, 'frozen', False):
+            self.applicationPath = os.path.abspath(os.path.dirname(sys.executable))
+        elif __file__:
+            self.applicationPath = os.path.abspath(os.path.dirname(__file__))
+
+        self.applicationPath += "\\"
+
+        self.resourcesPath = self.applicationPath + "resources\\"
+        self.configPath = self.resourcesPath + "config.ini"
+        self.config = configparser.ConfigParser()
+
+    def open_file_dialog(self, path):
         Tk().withdraw() # we don't want a full GUI, so keep the root window from appearing
         
         if(path is None):
@@ -120,25 +144,23 @@ class ConverterUI:
 
     def set_input_files(self, new_input_path):
 
-        self.input_valid = False
-
+        self.inputPathValid = False
         self.error_text_clear()
-
-        self.input_sequence_list_images.clear()
-        self.input_sequence_list_models.clear()
+        self.imagePathList.clear()
+        self.modelPathList.clear()
 
         res = self.validate_input_files(new_input_path)
 
         if(res == True):
-            path_to_input_sequence = new_input_path
-            self.input_path_label_set(path_to_input_sequence)
-            self.error_text_set("Input files set!")
+            self.inputSequencePath = new_input_path
+            self.input_path_label_set(new_input_path)
+            self.info_text_set("Input files set!")
 
             # Propose an output dir
-            self.set_proposed_output_files(path_to_input_sequence)
+            self.set_proposed_output_files(new_input_path)
 
-            self.input_valid = True
-            self.save_config("input", path_to_input_sequence)
+            self.inputPathValid = True
+            self.write_config_string("input", new_input_path)
             
         else:
             self.info_text_clear()
@@ -156,105 +178,116 @@ class ConverterUI:
                 splitted_path = file.split(".")
                 file_ending = splitted_path[len(splitted_path) - 1]
 
-                if(file_ending in self.valid_model_types):
-                    self.input_sequence_list_models.append(file)
+                if(file_ending in self.validModelTypes):
+                    self.modelPathList.append(file)
                 
-                elif(file_ending in self.valid_image_types):
-                    self.input_sequence_list_images.append(file)
+                elif(file_ending in self.validImageTypes):
+                    self.imagePathList.append(file)
 
-            if(len(self.input_sequence_list_models) < 1 and len(self.input_sequence_list_images) < 1):
+            if(len(self.modelPathList) < 1 and len(self.imagePathList) < 1):
                 return "No model/image files found in folder!"
 
-            self.input_sequence_list_models.sort()
-            self.input_sequence_list_images.sort()
+            self.modelPathList.sort()
+            self.imagePathList.sort()
 
             return True
 
     def set_proposed_output_files(self, input_path):
 
-        if(len(self.path_to_output_sequence) < 1 or self.path_to_output_sequence == self.no_path_warning):
-            self.path_to_output_sequence_proposed = input_path + "\\converted"
-            self.output_path_label_set("Proposed path: " + self.path_to_output_sequence_proposed)
+        if(len(self.outputSequencePath) < 1 or self.outputSequencePath == self.noPathWarning):
+            self.proposedOutputPath = input_path + "\\converted"
+            self.output_path_label_set("Proposed path: " + self.proposedOutputPath)
 
     def set_output_files(self, new_output_path):
 
-        self.output_valid = False
+        self.outputPathValid = False
 
         self.info_text_clear()
         self.error_text_clear()
 
         if(os.path.exists(new_output_path) == True):
-            self.path_to_output_sequence = new_output_path
-            self.output_path_label_set(self.path_to_output_sequence)
+            self.outputSequencePath = new_output_path
+            self.output_path_label_set(new_output_path)
             self.info_text_set("Output folder set!")
-            self.output_valid = True
-            self.path_to_output_sequence_proposed = ""
+            self.outputPathValid = True
+            self.proposedOutputPath = ""
 
         else:
             self.info_text_clear()
             self.error_text_set("Error: Output directory is not valid!")
 
     def get_output_path(self):
-        if(len(self.path_to_output_sequence) > 1 and self.path_to_output_sequence_proposed == ""):
-            return self.path_to_output_sequence
+        if(len(self.outputSequencePath) > 1 and self.proposedOutputPath == ""):
+            return self.outputSequencePath
         else:
-            return self.path_to_output_sequence_proposed
+            return self.proposedOutputPath
 
     def load_config(self):
+        #Create config on first startup
+        if not (os.path.exists(self.configPath)):
+            self.config['Paths'] = {}
+            self.config['Settings'] = {}
+            self.config['Paths']['input'] = ""
+            self.config['Settings']['DDS'] = "true"
+            self.config['Settings']['ASTC'] = "true"
+            self.save_config()
 
-        #Create config on first starup
-        if not (os.path.exists(self.path_to_config)):
-            config['Paths'] = {}
-            config['Paths']['input'] = ""
-            with open(self.path_to_config, "w") as configfile:
-                config.write(configfile)
-            print("Written config first time")
-        
-        config.read(self.path_to_config)
+        self.config.read(self.configPath)
 
-    def read_config(key):
-        global config
-        return config['Paths'][key]
+    def read_config_string(self, key):
+        return self.config['Paths'][key]
+    
+    def read_config_bool(self, key):
+        print('Settings' in self.config)
+        return self.config['Settings'].getboolean(key)
+    
+    def write_config_string(self, key, value):
+        self.config['Paths'][key] = value
 
-    def save_config(self, key, value):
-        global config 
-        config['Paths'][key] = value
-        with open(self.path_to_config, "w") as configfile:
-                config.write(configfile)
+    def write_config_bool(self, key, value):
+        self.config['Settings'][key] = str(value)
+
+    def save_config(self):
+        with open(self.configPath, "w") as configfile:
+                self.config.write(configfile)
 
 
     # --- Main UI ---
 
-    def advance_progressbar(self, error):
+    def advance_progressbar(self, error, errorText):
 
         self.progressbarLock.acquire()
 
-        self.processed_files += 1
+        if(error):
+            self.error_text_set(errorText)
+            self.cancel_processing_cb()
 
-        if(self.termination_signal.is_set() == False):
-            self.set_progressbar(self.processed_files / self.total_file_count)
-            self.info_text_set("Converting: " + str(self.processed_files) + " / " + str(self.total_file_count))
+        self.processedFileCount += 1
+
+        if(self.terminationSignal.is_set() == False):
+            self.set_progressbar(self.processedFileCount / self.totalFileCount)
+            self.info_text_set("Converting: " + str(self.processedFileCount) + " / " + str(self.totalFileCount))
 
         else:
             self.set_progressbar(1)
             self.info_text_set("Canceling...")
 
-        if(self.processed_files == self.total_file_count):
-            self.finish_conversion()
+        if(self.processedFileCount == self.totalFileCount):
+            self.conversionEnded = True
 
         self.progressbarLock.release()
 
     def finish_conversion(self):     
 
-        if(self.termination_signal.is_set()):
+        if(self.terminationSignal.is_set()):
             self.info_text_set("Canceled!")
         else:
-            self.metaData.write_metaData(self.path_to_output_sequence)
             self.info_text_set("Finished!")
         
+        self.converter.finish_conversion()
         self.set_progressbar(0)
         self.isRunning = False
-        self.converter.finish_process()
+        self.conversionEnded = False
 
     def set_progressbar(self, progress):
         dpg.set_value(self.progress_bar_ID, progress)
@@ -280,6 +313,12 @@ class ConverterUI:
 
     def RunUI(self):
 
+        self.InitDefaultPaths()
+        self.config = configparser.ConfigParser()
+        self.load_config()
+        self.generateDDS = self.read_config_bool("DDS")
+        self.generateASTC = self.read_config_bool("ASTC")
+
         dpg.create_context()
         dpg.configure_app(manual_callback_management=True)
         dpg.create_viewport(height=400, width=500, title="Geometry Sequence Converter")
@@ -288,21 +327,20 @@ class ConverterUI:
         with dpg.window(label="Geometry Sequence Converter", tag="main_window", min_size= [400, 500]):
 
             dpg.add_button(label="Select Input Directory", callback=lambda:self.open_input_dir_cb())
-            self.text_input_Dir_ID = dpg.add_text(self.path_to_input_sequence, wrap=450)
+            self.text_input_Dir_ID = dpg.add_text(self.inputSequencePath, wrap=450)
             dpg.add_spacer(height=40)
 
             dpg.add_button(label="Select Output Directory", callback=lambda:self.open_output_dir_cb())
-            self.text_output_Dir_ID = dpg.add_text(self.path_to_output_sequence, wrap=450)
+            self.text_output_Dir_ID = dpg.add_text(self.outputSequencePath, wrap=450)
 
             dpg.add_spacer(height=30)
 
-            dpg.add_checkbox(label="Convert textures for desktop devices(DDS)", default_value=True, callback=self.set_DDS_enabled_cb)
-            dpg.add_checkbox(label="Generate textures mobile devices (ATSC)", default_value=True, callback=self.set_ATSC_enabled_cb)
+            dpg.add_checkbox(label="Convert textures for desktop devices (DDS)", default_value=self.generateDDS, callback=self.set_DDS_enabled_cb)
+            dpg.add_checkbox(label="Generate textures mobile devices (ASTC)", default_value=self.generateASTC, callback=self.set_ASTC_enabled_cb)
 
             dpg.add_spacer(height=30)
 
             self.text_error_log_ID = dpg.add_text("", color=[255, 0, 0], wrap=500)
-            dpg.add_same_line()
             self.text_info_log_ID = dpg.add_text("", color=[255, 255, 255], wrap=500)
 
             self.progress_bar_ID = dpg.add_progress_bar(default_value=0, width=470)
@@ -311,24 +349,26 @@ class ConverterUI:
             dpg.add_same_line()
             dpg.add_button(label="Cancel", callback=lambda:self.cancel_processing_cb())
             dpg.add_same_line()
-            dpg.add_input_int(label="Thread count", default_value=8, min_value=0, max_value=256, width=100, tag="threadCount")
+            self.thread_count_ID = dpg.add_input_int(label="Thread count", default_value=8, min_value=0, max_value=64, width=100, tag="threadCount")
 
 
         dpg.show_viewport()
         dpg.set_primary_window("main_window", True)
 
-        self.config = configparser.ConfigParser()
-        self.load_config()
-        self.set_input_files(self.read_config("input"))
+        self.set_input_files(self.read_config_string("input"))
 
         while dpg.is_dearpygui_running():
             dpg.render_dearpygui_frame()
             jobs = dpg.get_callback_queue()
             dpg.run_callbacks(jobs)
 
+            if(self.conversionEnded):
+                self.finish_conversion()
+
         # Shutdown threads when they are still running
         self.cancel_processing_cb()
-
+        self.converter.finish_conversion()
+        self.save_config()
         dpg.destroy_context()
 
 if (__name__ == '__main__'):

@@ -1,117 +1,122 @@
 import os
+import time
 import subprocess
 import pymeshlab as ml
 import numpy as np
-from multiprocessing.pool import ThreadPool
 from threading import Lock
-from threading import Event
+from multiprocessing.pool import ThreadPool
 import Sequence_Metadata
-import Sequence_Converter_UI
 
 class SequenceConverter:
 
-    is_pointcloud = False
-    input_valid = False
-    output_valid = False
-    terminate_processing = False
+    isPointcloud = False
+    terminateProcessing = False
 
-    UI = Sequence_Converter_UI.ConverterUI()
     metaData = Sequence_Metadata.MetaData()
-    progressbarLock = Lock()
-    termination_signal = Event()
 
     modelPaths = []
     imagePaths = []
     modelPool = None
     texturePool = None
 
-    total_file_count = 0
-    max_active_threads = 8
+    processFinishedCB = None
+    inputPath = ""
+    outputPath = ""
+    resourcePath = ""
 
-    def start_conversion(self, model_paths_list, image_paths_list, threadCount):       
+    convertToDDS = False
+    convertToASTC = False
+
+    maxThreads = 8
+    activeThreadLock = Lock()
+    activeThreads = 0
+    
+
+    def start_conversion(self, model_paths_list, image_paths_list, input_path, output_path, resource_Path, processFinishedCB, threadCount, convertDDS, convertASTC):       
 
         self.metaData = Sequence_Metadata.MetaData()
-        self.terminate_conversion = False
+        self.terminateProcessing = False
         self.modelPaths = model_paths_list
         self.imagePaths = image_paths_list
+        self.inputPath = input_path
+        self.outputPath = output_path
+        self.resourcePath = resource_Path
+        self.processFinishedCB = processFinishedCB
+        self.convertToDDS = convertDDS
+        self.convertToASTC = convertASTC
 
         modelCount = len(model_paths_list)
-        textureCount = len(image_paths_list)
-        self.total_file_count =  modelCount + textureCount
-
         self.metaData.headerSizes = [None] * modelCount
         self.metaData.verticeCounts = [None] * modelCount
         self.metaData.indiceCounts = [None] * modelCount
 
-        self.max_active_threads= threadCount
+        self.maxThreads = threadCount
     
         self.process_images()
         self.process_models()
 
     def terminate_conversion(self):
-        self.terminate_conversion = True
+        self.terminateProcessing = True
 
-    def finish_process(self):
-
-        waitOnClose = True
-        while(waitOnClose):
-            try:
-                waitOnClose = False
-                self.modelPool.close()
-            except:
-                waitOnClose = True
-        
-        waitOnClose = True
-        while(waitOnClose):
-            try:
-                waitOnClose = False
-                self.texturePool.close()
-            except:
-                waitOnClose = True
-        
+    def finish_conversion(self):
         if(self.modelPool is not None):
-            self.modelPool.close()
+            waitOnClose = True
+            while(waitOnClose):
+                try:
+                    waitOnClose = False
+                    self.modelPool.close()
+                except:
+                    waitOnClose = True
             self.modelPool.join()
 
         if(self.texturePool is not None):
-            self.texturePool.close()
+            waitOnClose = True
+            while(waitOnClose):
+                try:
+                    waitOnClose = False
+                    self.texturePool.close()
+                except:
+                    waitOnClose = True
             self.texturePool.join()
 
-    def process_models(self, inputPath, outputPath, processFinishedCB):
+    def write_metadata(self):
+        self.metaData.write_metaData(self.outputPath)
 
-        if(len(self.modelPaths) < self.max_active_threads):
+    def process_models(self):
+
+        if(len(self.modelPaths) < self.maxThreads):
             threads = len(self.modelPaths)
         else:
-            threads = self.max_active_threads
+            threads = self.maxThreads
 
-        modelPool = ThreadPool(processes= threads)
-        modelPool.map_async(self.convert_model, self.modelPaths)
+        self.modelPool = ThreadPool(processes = self.maxThreads)
+        self.modelPool.map_async(self.convert_model, self.modelPaths)
 
-    def convert_model(self, file, input_path, output_path, process_finished_cb):
+    def convert_model(self, file):
 
         listIndex = self.modelPaths.index(file)
 
-        if(self.terminate_processing):
-            process_finished_cb(False)
+        if(self.terminateProcessing):
+            self.convert_model_finished(False, "")
             return
 
         splitted_file = file.split(".")
         splitted_file.pop() # We remove the last element, which is the file ending
         file_name = ''.join(splitted_file)
 
-        inputfile = input_path + "\\"+ file
-        outputfile =  output_path + "\\" + file_name + ".ply"
+        inputfile = self.inputPath + "\\"+ file
+        outputfile =  self.outputPath + "\\" + file_name + ".ply"
 
         ms = ml.MeshSet()
 
         try:
             ms.load_new_mesh(inputfile)
         except:
-            process_finished_cb(True, "Error opening file: " + inputfile)
+            self.convert_model_finished(True, "Error opening file: " + inputfile)
             return    
 
-        if(self.terminate_processing):
-            process_finished_cb(False)
+        if(self.terminateProcessing):
+            self.convert_model_finished(False, "")
             return
 
         faceCount = len(ms.current_mesh().face_matrix())
@@ -136,8 +141,8 @@ class SequenceConverter:
             ms.apply_filter("meshing_poly_to_tri")
 
         
-        if(self.terminate_processing):
-            process_finished_cb(False)
+        if(self.terminateProcessing):
+            self.convert_model_finished(False, "")
             return
 
         vertices = None
@@ -174,8 +179,8 @@ class SequenceConverter:
             else:
                 geoType = Sequence_Metadata.GeometryType.texturedMesh
 
-        if(self.terminate_processing):
-            process_finished_cb(False)
+        if(self.terminateProcessing):
+            self.convert_model_finished(False, "")
             return
 
         
@@ -265,42 +270,47 @@ class SequenceConverter:
 
         self.metaData.set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geoType, has_UVs, listIndex)
 
-        process_finished_cb(True)    
+        self.convert_model_finished(False, "")    
 
-    def process_images(self, file, input_path, output_path, process_finished_cb):
-        texturePool = ThreadPool(processes= self.max_active_threads)
-        texturePool.map_async(self.convert_image, self.input_sequence_list_images)
 
-    def convert_image(self, file, input_path, resource_path, output_path, process_finished_cb):
+    def convert_model_finished(self, error, errorText):
+        self.processFinishedCB(error, errorText)
 
-        if(self.terminate_processing):
-            process_finished_cb(False)
+    def process_images(self):
+        self.texturePool = ThreadPool(processes= self.maxThreads)
+        self.texturePool.map_async(self.convert_image, self.imagePaths)
+
+    def convert_image(self, file):
+
+        if(self.terminateProcessing):
+            self.processFinishedCB(False, "")
             return
 
         splitted_file = file.split(".")
         splitted_file.pop() # We remove the last element, which is the file ending
         file_name = ''.join(splitted_file)
 
-        inputfile = input_path + "\\"+ file
-        outputfile =  output_path + "\\" + file_name + ".dds"
+        inputfile = self.inputPath + "\\"+ file
+        outputfile =  self.outputPath + "\\" + file_name + ".bmp"
 
-        cmd = resource_path + "texconv -m 1 -f DXT1 -y -srgb " + inputfile + " -o " + output_path
-        texconv = subprocess.run(cmd)
-
-        if(texconv.returncode != 0):
-            process_finished_cb(True, "Error converting texture: " + inputfile)
+        if(self.convertToDDS):
+            cmd = self.resourcePath + "texconv -m 1 -ft bmp -y " + inputfile + " -o " + self.outputPath
+            if(subprocess.run(cmd).returncode != 0):
+                self.processFinishedCB(True, "Error converting texture: " + inputfile)
 
         height = -1
         width = -1
 
         # We don't need to do this for every file, just the first one
-        if(self.metaData.textureHeight == 0 or self.metaData.textureWidth == 0):
-            with open(outputfile, mode='rb') as file: # b is important -> binary
-                fileContent = file.read()
-                height = fileContent[13] * 256 + fileContent[12]
-                width = fileContent[17] * 256 + fileContent[16]
+        #if(self.metaData.textureHeight == 0 or self.metaData.textureWidth == 0):
+            #with open(outputfile, mode='rb') as file: # b is important -> binary
+                #fileContent = file.read()
+                #height = fileContent[13] * 256 + fileContent[12]
+                #width = fileContent[17] * 256 + fileContent[16]
 
-        size = os.path.getsize(outputfile) - 128
+        #size = os.path.getsize(outputfile) - 128
+
+        size = 0
 
         if(len(self.imagePaths) == 1):
             textureMode = Sequence_Metadata.TextureMode.single
@@ -308,9 +318,7 @@ class SequenceConverter:
             textureMode = Sequence_Metadata.TextureMode.perFrame
 
         self.metaData.set_metadata_texture(width, height, size, textureMode)
-
-        process_finished_cb()
-
+        self.processFinishedCB(False, "")
 
 
 

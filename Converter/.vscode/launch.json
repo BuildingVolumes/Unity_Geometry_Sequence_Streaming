@@ -9,7 +9,7 @@
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "./Sequence_Converter_UI.py",
             "console": "integratedTerminal",
             "subProcess": true
         }
