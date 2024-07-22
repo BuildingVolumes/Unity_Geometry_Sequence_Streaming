@@ -1,11 +1,11 @@
 import os
-import time
 import subprocess
 import pymeshlab as ml
 import numpy as np
 from threading import Lock
 from multiprocessing.pool import ThreadPool
 import Sequence_Metadata
+from PIL import Image
 
 class SequenceConverter:
 
@@ -26,13 +26,14 @@ class SequenceConverter:
 
     convertToDDS = False
     convertToASTC = False
+    convertToSRGB = False
 
     maxThreads = 8
     activeThreadLock = Lock()
     activeThreads = 0
     
 
-    def start_conversion(self, model_paths_list, image_paths_list, input_path, output_path, resource_Path, processFinishedCB, threadCount, convertDDS, convertASTC):       
+    def start_conversion(self, model_paths_list, image_paths_list, input_path, output_path, resource_Path, processFinishedCB, threadCount, convertDDS, convertASTC, convertSRGB):       
 
         self.metaData = Sequence_Metadata.MetaData()
         self.terminateProcessing = False
@@ -44,6 +45,7 @@ class SequenceConverter:
         self.processFinishedCB = processFinishedCB
         self.convertToDDS = convertDDS
         self.convertToASTC = convertASTC
+        self.convertToSRGB = convertSRGB
 
         modelCount = len(model_paths_list)
         self.metaData.headerSizes = [None] * modelCount
@@ -78,6 +80,8 @@ class SequenceConverter:
                 except:
                     waitOnClose = True
             self.texturePool.join()
+
+            self.write_metadata()
 
     def write_metadata(self):
         self.metaData.write_metaData(self.outputPath)
@@ -286,39 +290,67 @@ class SequenceConverter:
             self.processFinishedCB(False, "")
             return
 
-        splitted_file = file.split(".")
-        splitted_file.pop() # We remove the last element, which is the file ending
-        file_name = ''.join(splitted_file)
+        listIndex = self.imagePaths.index(file)
 
+        splitted_file = file.split(".")
+        file_name = splitted_file[0]
         inputfile = self.inputPath + "\\"+ file
-        outputfile =  self.outputPath + "\\" + file_name + ".bmp"
+
+        sizeDDS = 0
+        sizeASTC = 0
 
         if(self.convertToDDS):
-            cmd = self.resourcePath + "texconv -m 1 -ft bmp -y " + inputfile + " -o " + self.outputPath
+            outputfileDDS =  self.outputPath + "\\" + file_name + ".dds"
+            cmd = self.resourcePath + "texconv " + inputfile + " -o " + self.outputPath + " -m 1 -f DXT1 -y"
+            if(self.convertToSRGB):
+                cmd += " -srgbo" 
             if(subprocess.run(cmd).returncode != 0):
-                self.processFinishedCB(True, "Error converting texture: " + inputfile)
+                self.processFinishedCB(True, "Error converting DDS texture: " + inputfile)
+        
+        if(self.convertToASTC):
+            outputfileASCT =  self.outputPath + "\\" + file_name + ".astc"
+            cmd = self.resourcePath + "astcenc -cl " + inputfile + " " + outputfileASCT + " 6x6 -medium"
+            if(subprocess.run(cmd).returncode != 0):
+                self.processFinishedCB(True, "Error converting ASTC texture: " + inputfile)
 
-        height = -1
-        width = -1
+        # Write the metadata once per sequence
+        if(listIndex == 0):
+            if(self.convertToDDS):
+                sizeDDS = os.path.getsize(outputfileDDS) - 128 #128 = DDS header size
+            if(self.convertToASTC):
+                sizeASTC = os.path.getsize(outputfileASCT) - 20 #20 = ASTC header size
 
-        # We don't need to do this for every file, just the first one
-        #if(self.metaData.textureHeight == 0 or self.metaData.textureWidth == 0):
-            #with open(outputfile, mode='rb') as file: # b is important -> binary
-                #fileContent = file.read()
-                #height = fileContent[13] * 256 + fileContent[12]
-                #width = fileContent[17] * 256 + fileContent[16]
+            if(len(self.imagePaths) == 1):
+                textureMode = Sequence_Metadata.TextureMode.single
+            if(len(self.imagePaths) > 1):
+                textureMode = Sequence_Metadata.TextureMode.perFrame
 
-        #size = os.path.getsize(outputfile) - 128
+            dimensions = self.get_image_dimensions(inputfile)
+            self.metaData.set_metadata_texture(self.convertToDDS, self.convertToASTC, dimensions[0], dimensions[1], sizeDDS, sizeASTC, textureMode)
 
-        size = 0
 
-        if(len(self.imagePaths) == 1):
-            textureMode = Sequence_Metadata.TextureMode.single
-        if(len(self.imagePaths) > 1):
-            textureMode = Sequence_Metadata.TextureMode.perFrame
-
-        self.metaData.set_metadata_texture(width, height, size, textureMode)
         self.processFinishedCB(False, "")
 
+    def get_image_dimensions(self, filePath):
 
+            pilimg = Image.open(filePath) 
+            pilimg.load()
+            dimensions = [pilimg.width, pilimg.height]
+            pilimg.close()
+            return dimensions
+
+    def get_image_gamme_encoded(self, filePath):
+
+        gammaencoded = False
+
+        pilimg = Image.open(filePath)
+        pilimg.load()
+        
+        if("gamma" in pilimg.info):
+            gamma = pilimg.info["gamma"]
+            if(gamma >= 0.45 and gamma <= 0.46):
+                gammaencoded = True
+
+        pilimg.close()
+        return gammaencoded
 

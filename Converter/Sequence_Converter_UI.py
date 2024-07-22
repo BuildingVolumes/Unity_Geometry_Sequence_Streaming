@@ -17,6 +17,7 @@ class ConverterUI:
     text_info_log_ID = 0
     progress_bar_ID = 0
     thread_count_ID = 0
+    srgb_check_ID = 0
 
     ### +++++++++++++++++++++++++  PACKAGE INTO SINGLE EXECUTABLE ++++++++++++++++++++++++++++++++++
     #Use this prompt in the terminal to package this script into a single executable for your system
@@ -42,10 +43,11 @@ class ConverterUI:
     imagePathList = []
     generateDDS = True
     generateASTC = True
+    convertToSRGB = False
 
     validModelTypes = ["obj", "3ds", "fbx", "glb", "gltf", "obj", "ply", "ptx", "stl", "xyz", "pts"]
-    validImageTypes = ["jpg", "jpeg", "png", "dds", "bmp", "tga"]
-    invalidImageTypes = [".dds", ".atsc"]
+    validImageTypes = ["jpg", "jpeg", "png", "bmp", "tga"]
+    invalidImageTypes = ["dds", "atsc"]
 
     converter = SequenceConverter()
     terminationSignal = Event()
@@ -77,12 +79,14 @@ class ConverterUI:
         self.generateASTC = app_data
         self.write_config_bool("ASTC", app_data)
 
+    def set_SRGB_enabled_cb(self, sender, app_data):
+        self.convertToSRGB = app_data
+
     def start_conversion_cb(self):
 
         if(self.isRunning):
             return
         
-        self.isRunning = True
         self.conversionEnded = False
         self.terminationSignal.clear()
 
@@ -98,7 +102,7 @@ class ConverterUI:
             return False
         
         if(len(self.imagePathList) > 1 and len(self.modelPathList) != len(self.imagePathList)):
-            self.error_text_set("You need to either supply one texture per frame, or one texture for the whole sequence")
+            self.error_text_set("Only sequences with one image per frame or one image per sequence are supported")
             return False
 
         if(self.outputPathValid == False and len(self.outputSequencePath) > 1 ):
@@ -107,10 +111,12 @@ class ConverterUI:
 
         self.totalFileCount =  len(self.modelPathList) + len(self.imagePathList)
         self.processedFileCount = 0
-        self.converter.start_conversion(self.modelPathList, self.imagePathList, self.inputSequencePath, self.get_output_path(), self.resourcesPath, self.single_conversion_finished_cb, dpg.get_value(self.thread_count_ID), self.generateDDS, self.generateASTC)
+        self.converter.start_conversion(self.modelPathList, self.imagePathList, self.inputSequencePath, self.get_output_path(), self.resourcesPath, self.single_conversion_finished_cb, dpg.get_value(self.thread_count_ID), self.generateDDS, self.generateASTC, self.convertToSRGB)
 
         self.info_text_set("Converting...")
         self.set_progressbar(0)
+        self.isRunning = True
+
 
     def single_conversion_finished_cb(self, error, errorText):
         self.advance_progressbar(error, errorText)
@@ -184,8 +190,14 @@ class ConverterUI:
                 elif(file_ending in self.validImageTypes):
                     self.imagePathList.append(file)
 
+                elif(file_ending in self.invalidImageTypes):
+                    return "Can't convert already compressed (.dds, .astc) images! Please supply the images as .jpg, .png, .bmp or .tga!"
+
             if(len(self.modelPathList) < 1 and len(self.imagePathList) < 1):
                 return "No model/image files found in folder!"
+            
+            self.convertToSRGB = self.converter.get_image_gamme_encoded(os.path.join(input_path, self.imagePathList[0]))
+            self.set_SRGB_enabled(self.convertToSRGB)
 
             self.modelPathList.sort()
             self.imagePathList.sort()
@@ -310,6 +322,9 @@ class ConverterUI:
     def output_path_label_set(self, output_path):
         dpg.set_value(self.text_output_Dir_ID, output_path)
 
+    def set_SRGB_enabled(self, enabled):
+        dpg.set_value(self.srgb_check_ID, enabled)
+
 
     def RunUI(self):
 
@@ -321,10 +336,10 @@ class ConverterUI:
 
         dpg.create_context()
         dpg.configure_app(manual_callback_management=True)
-        dpg.create_viewport(height=400, width=500, title="Geometry Sequence Converter")
+        dpg.create_viewport(height=450, width=500, title="Geometry Sequence Converter")
         dpg.setup_dearpygui()
 
-        with dpg.window(label="Geometry Sequence Converter", tag="main_window", min_size= [400, 500]):
+        with dpg.window(label="Geometry Sequence Converter", tag="main_window", min_size= [500, 500]):
 
             dpg.add_button(label="Select Input Directory", callback=lambda:self.open_input_dir_cb())
             self.text_input_Dir_ID = dpg.add_text(self.inputSequencePath, wrap=450)
@@ -335,13 +350,14 @@ class ConverterUI:
 
             dpg.add_spacer(height=30)
 
-            dpg.add_checkbox(label="Convert textures for desktop devices (DDS)", default_value=self.generateDDS, callback=self.set_DDS_enabled_cb)
+            dpg.add_checkbox(label="Generate textures for desktop devices (DDS)", default_value=self.generateDDS, callback=self.set_DDS_enabled_cb)
             dpg.add_checkbox(label="Generate textures mobile devices (ASTC)", default_value=self.generateASTC, callback=self.set_ASTC_enabled_cb)
+            self.srgb_check_ID = dpg.add_checkbox(label="Convert to SRGB profile", default_value=self.generateASTC, callback=self.set_SRGB_enabled_cb)
 
             dpg.add_spacer(height=30)
 
-            self.text_error_log_ID = dpg.add_text("", color=[255, 0, 0], wrap=500)
-            self.text_info_log_ID = dpg.add_text("", color=[255, 255, 255], wrap=500)
+            self.text_error_log_ID = dpg.add_text("", color=[255, 0, 0], wrap=450)
+            self.text_info_log_ID = dpg.add_text("", color=[255, 255, 255], wrap=450)
 
             self.progress_bar_ID = dpg.add_progress_bar(default_value=0, width=470)
             dpg.add_spacer(height=5)

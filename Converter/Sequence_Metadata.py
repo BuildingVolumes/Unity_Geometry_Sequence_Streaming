@@ -15,13 +15,16 @@ class TextureMode(IntEnum):
 class MetaData():
     geometryType = GeometryType.point
     textureMode = TextureMode.none
+    DDS = False
+    ASTC = False
     hasUVs = False
     maxVertexCount = 0
     maxIndiceCount = 0
     maxBounds = [0,0,0,0,0,0]
     textureWidth = 0
     textureHeight = 0
-    textureSize = 0
+    textureSizeDDS = 0
+    textureSizeASTC = 0
     headerSizes = []
     verticeCounts = []
     indiceCounts = []
@@ -34,13 +37,16 @@ class MetaData():
         asDict = {
             "geometryType" : int(self.geometryType),
             "textureMode" : int(self.textureMode),
+            "DDS" : self.DDS,
+            "ASTC" : self.ASTC,
             "hasUVs" : self.hasUVs,
             "maxVertexCount": self.maxVertexCount,
             "maxIndiceCount" : self.maxIndiceCount,
             "maxBounds" : self.maxBounds,
             "textureWidth" : self.textureWidth,
             "textureHeight" : self.textureHeight,
-            "textureSize" : self.textureSize,
+            "textureSizeDDS" : self.textureSizeDDS,
+            "textureSizeASTC" : self.textureSizeASTC,
             "headerSizes" : self.headerSizes,
             "verticeCounts" : self.verticeCounts,
             "indiceCounts" : self.indiceCounts,
@@ -75,7 +81,7 @@ class MetaData():
 
         self.metaDataLock.release()
 
-    def set_metadata_texture(self, height, width, size, textureMode):
+    def set_metadata_texture(self, DDS, ASTC, width, height, sizeDDS, sizeASTC, textureMode):
 
         self.metaDataLock.acquire()
 
@@ -85,10 +91,15 @@ class MetaData():
         if(width > self.textureWidth):
             self.textureWidth = width
 
-        if(size > self.textureSize):
-            self.textureSize = size
+        if(sizeDDS > self.textureSizeDDS):
+            self.textureSizeDDS = sizeDDS
+
+        if(sizeASTC > self.textureSizeASTC):
+            self.textureSizeASTC = sizeASTC
 
         self.textureMode = textureMode
+        self.DDS = DDS
+        self.ASTC = ASTC
 
         self.metaDataLock.release()
 
