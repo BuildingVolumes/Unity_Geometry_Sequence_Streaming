@@ -100,10 +100,6 @@ class ConverterUI:
         if(self.outputPathValid == False and self.proposedOutputPath == "" ):
             self.error_text_set("Output folder is not configured correctly")
             return False
-        
-        if(len(self.imagePathList) > 1 and len(self.modelPathList) != len(self.imagePathList)):
-            self.error_text_set("Only sequences with one image per frame or one image per sequence are supported")
-            return False
 
         if(self.outputPathValid == False and len(self.outputSequencePath) > 1 ):
             if not (os.path.exists(self.proposedOutputPath)):
@@ -196,8 +192,9 @@ class ConverterUI:
             if(len(self.modelPathList) < 1 and len(self.imagePathList) < 1):
                 return "No model/image files found in folder!"
             
-            self.convertToSRGB = self.converter.get_image_gamme_encoded(os.path.join(input_path, self.imagePathList[0]))
-            self.set_SRGB_enabled(self.convertToSRGB)
+            if(len(self.imagePathList) > 1):
+                self.convertToSRGB = self.converter.get_image_gamme_encoded(os.path.join(input_path, self.imagePathList[0]))
+                self.set_SRGB_enabled(self.convertToSRGB)
 
             self.modelPathList.sort()
             self.imagePathList.sort()

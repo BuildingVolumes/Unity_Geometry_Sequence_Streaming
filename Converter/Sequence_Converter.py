@@ -54,8 +54,10 @@ class SequenceConverter:
 
         self.maxThreads = threadCount
     
-        self.process_images()
-        self.process_models()
+        if(len(model_paths_list) > 0):
+            self.process_models()
+        if(len(image_paths_list) > 0):
+            self.process_images()
 
     def terminate_conversion(self):
         self.terminateProcessing = True
@@ -93,7 +95,7 @@ class SequenceConverter:
         else:
             threads = self.maxThreads
 
-        self.modelPool = ThreadPool(processes = self.maxThreads)
+        self.modelPool = ThreadPool(processes = threads)
         self.modelPool.map_async(self.convert_model, self.modelPaths)
 
     def convert_model(self, file):
@@ -137,14 +139,9 @@ class SequenceConverter:
         #There is a chance that the file might have wedge tex
         #coordinates which are unsupported in Unity, so we convert them
         #Also we need to ensure that our mesh contains only triangles!
-        if(is_pointcloud == False):
+        if(is_pointcloud == False and ms.current_mesh().has_wedge_tex_coord() == True):
+            ms.apply_filter("compute_texcoord_transfer_wedge_to_vertex")
             
-            if(ms.current_mesh().has_wedge_tex_coord() == True):
-                ms.apply_filter("compute_texcoord_transfer_wedge_to_vertex")
-            
-            ms.apply_filter("meshing_poly_to_tri")
-
-        
         if(self.terminateProcessing):
             self.convert_model_finished(False, "")
             return
@@ -226,49 +223,54 @@ class SequenceConverter:
             f.write(headerASCII)
 
 
-            #Constructing the mesh data, as binary
-            body = []
+            #Constructing the mesh data, as binary array
 
             if(is_pointcloud == True):
                 
-                verticeRaw = vertices.tobytes()
-                vertice_colors_raw = vertice_colors.tobytes()
+                verticePositionsBytes = np.frombuffer(vertices.tobytes(), dtype=np.uint8)
+                verticeColorsBytes = np.frombuffer(vertice_colors.tobytes(), dtype=np.uint8)
 
-                for index, line in enumerate(vertices):
-                    #Copy 3 floats for xyz coordinates
-                    body.extend(verticeRaw[index * 3 * 4:(index * 3 * 4) + 12])
+                #Reshape arrays into 2D array, so that the elements of one vertex each occupy one row
+                verticePositionsBytes = np.reshape(verticePositionsBytes, (-1, 12))
+                verticeColorsBytes = np.reshape(verticeColorsBytes, (-1, 4))
 
-                    #Copy 4 bytes for Color and convert from BGRA to RGBA
-                    body.append(vertice_colors_raw[(index * 4) + 2])
-                    body.append(vertice_colors_raw[(index * 4) + 1])
-                    body.append(vertice_colors_raw[(index * 4) + 0])
-                    body.append(vertice_colors_raw[(index * 4) + 3])
+                #Convert colors from BGRA to RGBA
+                verticeColorsBytes = verticeColorsBytes[..., [2,1,0,3]]
 
+                #Interweave arrays, so that each row contains position + color
+                body = np.concatenate((verticePositionsBytes, verticeColorsBytes), axis = 1)
+
+                #Flatten the array into a 1D array
+                body.ravel()
 
             else:
-                verticeRaw = vertices.tobytes()
-                faceRaw = faces.tobytes()
+
+                #Vertices and UVS
+                verticePositionsBytes = np.frombuffer(vertices.tobytes(), dtype=np.uint8)
 
                 if(has_UVs == True):
-                    uvRaw = uvs.tobytes()
+                    uvsBytes = np.frombuffer(uvs.tobytes(), dtype=np.uint8)
 
-                for index, line in enumerate(vertices):
-                    #Copy 3 floats for xyz coordinates
-                    body.extend(verticeRaw[index * 3 * 4:(index * 3 * 4) + 12])
+                    verticePositionsBytes = np.reshape(verticePositionsBytes, (-1, 12))
+                    uvsBytes = np.reshape(uvsBytes, (-1, 8))
+                    
+                    body = np.concatenate((verticePositionsBytes, uvsBytes), axis = 1).ravel()
 
-                    #Copy 2 floats of Uv texture coordinates
-                    if(has_UVs == True):
-                        body.extend(uvRaw[index * 2 * 4:(index * 2 * 4) + 8])
+                else:
+                    body = verticePositionsBytes
 
-                for index, line in enumerate(faces):                
-                    #For PLY files, each indice bundle has to mention how much indices it contains
-                    #As we only have triangular faces, it will always be three
-                    indiceArray = [3]
-                    body.extend(bytes(indiceArray))
 
-                    #Copy three UInt32s as face indices
-                    body.extend(faceRaw[index * 3 * 4: (index * 3 * 4) + 12])
+                #Indices
+                IndiceBytes = np.frombuffer(faces.tobytes(), dtype=np.uint8)
+                IndiceBytes = np.reshape(IndiceBytes, (-1, 12)) # Convert to 2D array with 3 indices per line
 
+                #For the vertices, we need to add one byte per line which indicates how much indices per face exist
+                #We always have 3 indices, so we add a byte with value 3 to each indice row
+                threes = np.full((len(faces), 1), 3, dtype= np.uint8)
+                IndiceBytes = np.concatenate((threes, IndiceBytes), axis = 1)
+                IndiceBytes = IndiceBytes.ravel()
+
+                body = np.concatenate((body, IndiceBytes))
 
             f.write(bytes(body))
 
@@ -281,7 +283,13 @@ class SequenceConverter:
         self.processFinishedCB(error, errorText)
 
     def process_images(self):
-        self.texturePool = ThreadPool(processes= self.maxThreads)
+
+        if(len(self.imagePaths) < self.maxThreads):
+            threads = len(self.imagePaths)
+        else:
+            threads = self.maxThreads
+
+        self.texturePool = ThreadPool(processes= threads)
         self.texturePool.map_async(self.convert_image, self.imagePaths)
 
     def convert_image(self, file):
@@ -301,7 +309,7 @@ class SequenceConverter:
 
         if(self.convertToDDS):
             outputfileDDS =  self.outputPath + "\\" + file_name + ".dds"
-            cmd = self.resourcePath + "texconv " + inputfile + " -o " + self.outputPath + " -m 1 -f DXT1 -y"
+            cmd = self.resourcePath + "texconv " + inputfile + " -o " + self.outputPath + " -m 1 -f DXT1 -y -nologo"
             if(self.convertToSRGB):
                 cmd += " -srgbo" 
             if(subprocess.run(cmd).returncode != 0):
@@ -309,7 +317,7 @@ class SequenceConverter:
         
         if(self.convertToASTC):
             outputfileASCT =  self.outputPath + "\\" + file_name + ".astc"
-            cmd = self.resourcePath + "astcenc -cl " + inputfile + " " + outputfileASCT + " 6x6 -medium"
+            cmd = self.resourcePath + "astcenc -cl " + inputfile + " " + outputfileASCT + " 6x6 -medium -silent"
             if(subprocess.run(cmd).returncode != 0):
                 self.processFinishedCB(True, "Error converting ASTC texture: " + inputfile)
 
@@ -318,7 +326,7 @@ class SequenceConverter:
             if(self.convertToDDS):
                 sizeDDS = os.path.getsize(outputfileDDS) - 128 #128 = DDS header size
             if(self.convertToASTC):
-                sizeASTC = os.path.getsize(outputfileASCT) - 20 #20 = ASTC header size
+                sizeASTC = os.path.getsize(outputfileASCT) - 16 #20 = ASTC header size
 
             if(len(self.imagePaths) == 1):
                 textureMode = Sequence_Metadata.TextureMode.single
