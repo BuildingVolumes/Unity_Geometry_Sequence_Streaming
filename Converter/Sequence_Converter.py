@@ -83,7 +83,7 @@ class SequenceConverter:
                     waitOnClose = True
             self.texturePool.join()
 
-            self.write_metadata()
+        self.write_metadata()
 
     def write_metadata(self):
         self.metaData.write_metaData(self.outputPath)
