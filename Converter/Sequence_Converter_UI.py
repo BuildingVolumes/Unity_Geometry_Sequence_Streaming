@@ -247,7 +247,6 @@ class ConverterUI:
         return self.config['Paths'][key]
     
     def read_config_bool(self, key):
-        print('Settings' in self.config)
         return self.config['Settings'].getboolean(key)
     
     def write_config_string(self, key, value):
