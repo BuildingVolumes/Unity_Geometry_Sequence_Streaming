@@ -30,6 +30,7 @@ class SequenceConverter:
 
     maxThreads = 8
     activeThreadLock = Lock()
+    loadMeshLock = Lock()
     activeThreads = 0
     
 
@@ -62,7 +63,7 @@ class SequenceConverter:
     def terminate_conversion(self):
         self.terminateProcessing = True
 
-    def finish_conversion(self):
+    def finish_conversion(self, writeMetaData):
         if(self.modelPool is not None):
             waitOnClose = True
             while(waitOnClose):
@@ -83,7 +84,8 @@ class SequenceConverter:
                     waitOnClose = True
             self.texturePool.join()
 
-        self.write_metadata()
+        if(writeMetaData):
+            self.write_metadata()
 
     def write_metadata(self):
         self.metaData.write_metaData(self.outputPath)
@@ -115,11 +117,16 @@ class SequenceConverter:
 
         ms = ml.MeshSet()
 
+        self.loadMeshLock.acquire()
+
         try:
             ms.load_new_mesh(inputfile)
         except:
+            self.loadMeshLock.release()
             self.convert_model_finished(True, "Error opening file: " + inputfile)
             return    
+
+        self.loadMeshLock.release()
 
         if(self.terminateProcessing):
             self.convert_model_finished(False, "")
@@ -140,8 +147,9 @@ class SequenceConverter:
         #coordinates which are unsupported in Unity, so we convert them
         #Also we need to ensure that our mesh contains only triangles!
         if(is_pointcloud == False and ms.current_mesh().has_wedge_tex_coord() == True):
-            ms.apply_filter("compute_texcoord_transfer_wedge_to_vertex")
-            
+            ms.compute_texcoord_transfer_wedge_to_vertex()           
+
+
         if(self.terminateProcessing):
             self.convert_model_finished(False, "")
             return

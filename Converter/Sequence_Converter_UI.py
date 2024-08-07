@@ -22,7 +22,7 @@ class ConverterUI:
     ### +++++++++++++++++++++++++  PACKAGE INTO SINGLE EXECUTABLE ++++++++++++++++++++++++++++++++++
     #Use this prompt in the terminal to package this script into a single executable for your system
     #You need to have PyInstaller installed in your local environment
-    # pyinstaller SequenceConverter_UI.py --collect-all=pymeshlab --icon=resources/logo.ico -F 
+    # pyinstaller Sequence_Converter_UI.py --collect-all=pymeshlab --collect-all=numpy --icon=resources/logo.ico -F 
 
     isRunning = False
     conversionEnded = False
@@ -293,7 +293,7 @@ class ConverterUI:
         else:
             self.info_text_set("Finished!")
         
-        self.converter.finish_conversion()
+        self.converter.finish_conversion(not self.terminationSignal.is_set())
         self.set_progressbar(0)
         self.isRunning = False
         self.conversionEnded = False
@@ -380,7 +380,7 @@ class ConverterUI:
 
         # Shutdown threads when they are still running
         self.cancel_processing_cb()
-        self.converter.finish_conversion()
+        self.converter.finish_conversion(False)
         self.save_config()
         dpg.destroy_context()
 
