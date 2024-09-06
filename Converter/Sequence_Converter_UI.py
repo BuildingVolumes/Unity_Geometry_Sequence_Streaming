@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import configparser
 from threading import Event
 from threading import Lock
@@ -196,8 +197,8 @@ class ConverterUI:
                 self.convertToSRGB = self.converter.get_image_gamme_encoded(os.path.join(input_path, self.imagePathList[0]))
                 self.set_SRGB_enabled(self.convertToSRGB)
 
-            self.modelPathList.sort()
-            self.imagePathList.sort()
+            self.human_sort(self.modelPathList)
+            self.human_sort(self.imagePathList)
 
             return True
 
@@ -258,6 +259,18 @@ class ConverterUI:
     def save_config(self):
         with open(self.configPath, "w") as configfile:
                 self.config.write(configfile)
+
+    def tryint(self, s):
+        try:
+            return int(s)
+        except ValueError:
+            return s
+
+    def alphanum_key(self, s):
+        return [ self.tryint(c) for c in re.split('([0-9]+)', s) ]
+
+    def human_sort(self, l):
+        l.sort(key=self.alphanum_key)
 
 
     # --- Main UI ---
