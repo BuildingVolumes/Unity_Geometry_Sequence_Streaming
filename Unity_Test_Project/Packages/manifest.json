@@ -1,9 +1,9 @@
 {
   "dependencies": {
-    "com.buildingvolumes.geometry_sequence_streaming": "file:C:/Dev/VolumetricCapture/Unity Package/Unity_Geometry_Sequence_Streaming/Geometry_Sequence_Streaming_Package",
+    "com.buildingvolumes.geometry_sequence_streaming": "file:C:/Dev/Volcapture/Unity_Geometry_Sequence_Streaming/Geometry_Sequence_Streaming_Package",
     "com.unity.ai.navigation": "1.1.5",
     "com.unity.analytics": "3.8.1",
-    "com.unity.collab-proxy": "2.3.1",
+    "com.unity.collab-proxy": "2.4.3",
     "com.unity.ide.visualstudio": "2.0.22",
     "com.unity.ide.vscode": "1.2.5",
     "com.unity.jobs": "0.70.0-preview.7",

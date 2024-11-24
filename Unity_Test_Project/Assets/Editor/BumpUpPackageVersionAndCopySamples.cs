@@ -8,10 +8,11 @@ using UnityEngine.Playables;
 using UnityEngine.Timeline;
 using System.Collections.Generic;
 using UnityEditor.SceneManagement;
+using GluonGui.WorkspaceWindow.Views.WorkspaceExplorer.Explorer;
 
 public class BumpUpPackageVersionAndCopySamples : EditorWindow
 {
-    string pathToPackage = "C:\\Users\\Christopher\\Desktop\\Volcapture\\Visualization\\Unity_Geometry_Sequence_Streaming\\Geometry_Sequence_Streaming_Package";
+    string pathToPackage = "C:\\Dev\\Volcapture\\Unity_Geometry_Sequence_Streaming\\Geometry_Sequence_Streaming_Package\\";
     string pathToSamplesRootFolder = "Assets\\Samples\\Geometry Sequence Streaming\\";
     string pathToSamplesFolder = "";
     string pathToNewSamplesFolder = "";
@@ -25,12 +26,18 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
     int newMinor;
     int newPatch;
 
+    static bool pathValid = false;
+
     [MenuItem("UGGS Package/Increment package version and copy samples")]
     static void Init()
     {
         BumpUpPackageVersionAndCopySamples window = GetWindow<BumpUpPackageVersionAndCopySamples>();
+
         window.titleContent = new GUIContent("Change package versioning");
         window.ShowPopup();
+
+        if (!pathValid)
+            window.Close();
     }
 
     private void CreateGUI()
@@ -38,17 +45,17 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
         pathToPackageJSON = Path.Combine(pathToPackage, "package.json");
         pathToSamplesPackageFolder = Path.Combine(pathToPackage, "Samples~\\StreamingSamples\\");
 
-        GetCurrentPackageVersion();
-
         if (!Directory.Exists(pathToPackage) || !File.Exists(pathToPackageJSON))
         {
-            EditorGUILayout.LabelField("Package path is not valid, please change in script", EditorStyles.boldLabel);
-            GUILayout.Space(70);
-            if (GUILayout.Button("Ok!")) this.Close();
-            return;
+            EditorUtility.DisplayDialog("Path invalid!", "Path to package not found! Please change path in script", "Ok");
+            pathValid = false;
         }
 
-
+        else
+        {
+            GetCurrentPackageVersion();
+            pathValid = true;
+        }
     }
 
     void OnGUI()
@@ -126,19 +133,22 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
     void UpdateSamples(string currentVersion, string newVersion)
     {
-        string pathToScene1 = pathToSamplesFolder + "01_Basic_Example.unity";
-        string pathToScene2 = pathToSamplesFolder + "02_Timeline_Example.unity";
-        string pathToScene3 = pathToSamplesFolder + "03_API_Example.unity";
+        string pathToBasicSceneMesh = pathToSamplesFolder + "01_Basic_Example.unity";
+        string pathToBasicScenePC = pathToSamplesFolder + "02_Pointcloud_Example.unity";
+        string pathToTimelineScene = pathToSamplesFolder + "03_Timeline_Example.unity";
+        string pathToAPIScene = pathToSamplesFolder + "04_API_Example.unity";
 
-        string pathToNewSampleData = "Samples\\Geometry Sequence Streaming\\" + newVersion + "\\Streaming Samples\\ExampleData\\Twisty_Box";
+        string pathToNewSampleDataMesh = "Samples\\Geometry Sequence Streaming\\" + newVersion + "\\Streaming Samples\\ExampleData\\TexturedMesh_Sequence_Sample";
+        string pathToNewSampleDataPC = "Samples\\Geometry Sequence Streaming\\" + newVersion + "\\Streaming Samples\\ExampleData\\Pointcloud_Sequence_Sample";
 
-        UpdateSample1(pathToScene1, pathToNewSampleData);
-        UpdateSample2(pathToScene2, pathToNewSampleData);
-        UpdateSample3(pathToScene3, pathToNewSampleData);
+        UpdateBasicSample(pathToBasicSceneMesh, pathToNewSampleDataMesh);
+        UpdateBasicSample(pathToBasicScenePC, pathToNewSampleDataPC);
+        UpdateTimelineSample(pathToTimelineScene, pathToNewSampleDataMesh);
+        UpdateAPISample(pathToAPIScene, pathToNewSampleDataMesh);
         RenameSamplePath(pathToSamplesRootFolder + currentVersion, pathToSamplesRootFolder + newVersion);
     }
 
-    bool UpdateSample1(string pathToScene, string pathToNewSampleData)
+    bool UpdateBasicSample(string pathToScene, string pathToNewSampleData)
     {
         //Basic Sample
         try
@@ -148,14 +158,14 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
         catch
         {
-            Debug.LogError("Could not load sample scene 1!");
+            Debug.LogError("Could not load basic sample mesh scene!");
             return false;
         }
 
         GeometrySequencePlayer player = (GeometrySequencePlayer)FindObjectOfType<GeometrySequencePlayer>();
         if (player.GetRelativeSequencePath() == null)
         {
-            Debug.LogError("Could not finde path in Sample 1!");
+            Debug.LogError("Could not finde path in basic sample mesh!");
             return false;
         }
 
@@ -164,7 +174,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
         return true;
     }
 
-    bool UpdateSample2(string pathToScene, string pathToNewSampleData)
+    bool UpdateTimelineSample(string pathToScene, string pathToNewSampleData)
     {
         //Timeline Sample
         try
@@ -174,7 +184,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
         catch
         {
-            Debug.LogError("Could not load sample scene 2!");
+            Debug.LogError("Could not load timeline sample scene!");
             return false;
         }
 
@@ -193,7 +203,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
             if (geoClip.relativePath == null)
             {
-                Debug.LogError("Could not finde path in timeline on Sample 2!");
+                Debug.LogError("Could not finde path in timeline Sample!");
                 return false;
             }
 
@@ -208,7 +218,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
         return true;
     }
 
-    bool UpdateSample3(string pathToScene, string pathToNewSampleData)
+    bool UpdateAPISample(string pathToScene, string pathToNewSampleData)
     {
         //API Sample
         try
@@ -218,14 +228,14 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
         catch
         {
-            Debug.LogError("Could not load sample scene 3!");
+            Debug.LogError("Could not load API sample scene!");
             return false;
         }
 
         GeometrySequenceAPIExample api = (GeometrySequenceAPIExample)FindObjectOfType<GeometrySequenceAPIExample>();
         if (api.sequencePath == null)
         {
-            Debug.LogError("Could not find path in Sample 3!");
+            Debug.LogError("Could not find path in API Sample!");
             return false;
         }
 
@@ -245,7 +255,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
 
             if (error != "")
             {
-                Debug.LogError("Could not rename sample directory: " + error);
+                Debug.LogError("Could not rename sample directory: " + error + " Maybe you need to close Visual Studio?");
                 return false;
             }
 
@@ -291,8 +301,17 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
         // Cache directories before we start copying
         DirectoryInfo[] dirs = dir.GetDirectories();
 
+        //Delete the files in the destination directory
+        foreach(string filePath in Directory.GetFiles(destinationDir))
+        {
+            File.Delete(filePath);
+        }
+
+
+
         // Create the destination directory
         Directory.CreateDirectory(destinationDir);
+
 
         // Get the files in the source directory and copy to the destination directory
         foreach (FileInfo file in dir.GetFiles())

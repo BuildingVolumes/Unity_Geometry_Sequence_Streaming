@@ -5,7 +5,13 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/ComputeShaderDev.unity
     guid: cbbd4c97a8726eb4497ad6a13d458f2e
+  - enabled: 1
+    path: Assets/Basic_Build_Sample.unity
+    guid: f0f7e2a31852a6c419bc77cc899ee22f
+  - enabled: 1
+    path: Assets/Basic_Build_Sample_PC.unity
+    guid: 6b09899ec332ee04eb46e280d0d6db69
   m_configObjects: {}
