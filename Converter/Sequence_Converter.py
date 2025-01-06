@@ -3,6 +3,7 @@ import subprocess
 import pymeshlab as ml
 import numpy as np
 from threading import Lock
+import threading
 from multiprocessing.pool import ThreadPool
 import Sequence_Metadata
 from PIL import Image
@@ -28,13 +29,15 @@ class SequenceConverter:
     convertToASTC = False
     convertToSRGB = False
 
+    decimatePointcloud = False
+    decimatePercentage = 0
+
     maxThreads = 8
-    activeThreadLock = Lock()
     loadMeshLock = Lock()
     activeThreads = 0
     
 
-    def start_conversion(self, model_paths_list, image_paths_list, input_path, output_path, resource_Path, processFinishedCB, threadCount, convertDDS, convertASTC, convertSRGB):       
+    def start_conversion(self, model_paths_list, image_paths_list, input_path, output_path, resource_Path, processFinishedCB, threadCount, convertDDS, convertASTC, convertSRGB, decimatePointcloud, decimatePercentage):       
 
         self.metaData = Sequence_Metadata.MetaData()
         self.terminateProcessing = False
@@ -47,6 +50,8 @@ class SequenceConverter:
         self.convertToDDS = convertDDS
         self.convertToASTC = convertASTC
         self.convertToSRGB = convertSRGB
+        self.decimatePointcloud = decimatePointcloud
+        self.decimatePercentage = decimatePercentage
 
         modelCount = len(model_paths_list)
         self.metaData.headerSizes = [None] * modelCount
@@ -117,7 +122,7 @@ class SequenceConverter:
 
         ms = ml.MeshSet()
 
-        self.loadMeshLock.acquire()
+        self.loadMeshLock.acquire() # If we don't lock the mesh loading process, crashes might occur
 
         try:
             ms.load_new_mesh(inputfile)
@@ -197,15 +202,18 @@ class SequenceConverter:
         #to PLY with our very stringent structure. This is needed because we want to keep the
         #work on the Unity side as low as possible, so we basically want to load the data from disk into the memory
         #without needing to change anything
-
         with open(outputfile, 'wb') as f:
+
+            #If pointcloud decimation is enabled, calculate how many points were going to write
+            if(self.decimatePointcloud):
+                vertexCount = int(len(vertices) * (self.decimatePercentage / 100))
 
             #constructing the ascii header
             header = "ply" + "\n"
             header += "format binary_little_endian 1.0" + "\n"
             header += "comment Exported for use in Unity Geometry Streaming Plugin" + "\n"
 
-            header += "element vertex " + str(len(vertices)) + "\n"
+            header += "element vertex " + str(vertexCount) + "\n"
             header += "property float x" + "\n" 
             header += "property float y" + "\n"
             header += "property float z" + "\n"
@@ -230,9 +238,7 @@ class SequenceConverter:
 
             f.write(headerASCII)
 
-
             #Constructing the mesh data, as binary array
-
             if(is_pointcloud == True):
                 
                 verticePositionsBytes = np.frombuffer(vertices.tobytes(), dtype=np.uint8)
@@ -247,6 +253,11 @@ class SequenceConverter:
 
                 #Interweave arrays, so that each row contains position + color
                 body = np.concatenate((verticePositionsBytes, verticeColorsBytes), axis = 1)
+
+                #Decimate n random elements to reduce points (if enabled)
+                if(self.decimatePointcloud):
+                    np.random.shuffle(body)
+                    body = body[0:vertexCount]
 
                 #Flatten the array into a 1D array
                 body.ravel()
@@ -284,7 +295,7 @@ class SequenceConverter:
 
         self.metaData.set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geoType, has_UVs, listIndex)
 
-        self.convert_model_finished(False, "")    
+        self.convert_model_finished(False, "") 
 
 
     def convert_model_finished(self, error, errorText):

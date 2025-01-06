@@ -19,6 +19,8 @@ class ConverterUI:
     progress_bar_ID = 0
     thread_count_ID = 0
     srgb_check_ID = 0
+    pointcloud_decimation_ID = 0
+    decimation_percentage_ID = 0
 
     ### +++++++++++++++++++++++++  PACKAGE INTO SINGLE EXECUTABLE ++++++++++++++++++++++++++++++++++
     #Use this prompt in the terminal to package this script into a single executable for your system
@@ -45,6 +47,8 @@ class ConverterUI:
     generateDDS = True
     generateASTC = True
     convertToSRGB = False
+    decimatePointcloud = False
+    decimatePercentage = 100
 
     validModelTypes = ["obj", "3ds", "fbx", "glb", "gltf", "obj", "ply", "ptx", "stl", "xyz", "pts"]
     validImageTypes = ["jpg", "jpeg", "png", "bmp", "tga"]
@@ -83,6 +87,14 @@ class ConverterUI:
     def set_SRGB_enabled_cb(self, sender, app_data):
         self.convertToSRGB = app_data
 
+    def set_Decimation_enabled_cb(self, sender, app_data):
+        self.decimatePointcloud = app_data
+        self.write_config_bool("decimatePointcloud", app_data)
+
+    def set_Decimation_percentage_cb(self, sender, app_data):
+        self.decimatePercentage = app_data
+        self.write_settings_string("decimatePercentage", str(app_data))
+
     def start_conversion_cb(self):
 
         if(self.isRunning):
@@ -108,7 +120,7 @@ class ConverterUI:
 
         self.totalFileCount =  len(self.modelPathList) + len(self.imagePathList)
         self.processedFileCount = 0
-        self.converter.start_conversion(self.modelPathList, self.imagePathList, self.inputSequencePath, self.get_output_path(), self.resourcesPath, self.single_conversion_finished_cb, dpg.get_value(self.thread_count_ID), self.generateDDS, self.generateASTC, self.convertToSRGB)
+        self.converter.start_conversion(self.modelPathList, self.imagePathList, self.inputSequencePath, self.get_output_path(), self.resourcesPath, self.single_conversion_finished_cb, dpg.get_value(self.thread_count_ID), self.generateDDS, self.generateASTC, self.convertToSRGB, self.decimatePointcloud, self.decimatePercentage)
 
         self.info_text_set("Converting...")
         self.set_progressbar(0)
@@ -163,7 +175,7 @@ class ConverterUI:
             self.set_proposed_output_files(new_input_path)
 
             self.inputPathValid = True
-            self.write_config_string("input", new_input_path)
+            self.write_path_string("input", new_input_path)
             
         else:
             self.info_text_clear()
@@ -240,18 +252,26 @@ class ConverterUI:
             self.config['Paths']['input'] = ""
             self.config['Settings']['DDS'] = "true"
             self.config['Settings']['ASTC'] = "true"
+            self.config['Settings']['decimatePointcloud'] = "false"
+            self.config['Settings']['decimatePercentage'] = "100"
             self.save_config()
 
         self.config.read(self.configPath)
 
-    def read_config_string(self, key):
+    def read_path_string(self, key):
         return self.config['Paths'][key]
+    
+    def read_settings_string(self, key):
+        return self.config['Settings'][key]
     
     def read_config_bool(self, key):
         return self.config['Settings'].getboolean(key)
     
-    def write_config_string(self, key, value):
+    def write_path_string(self, key, value):
         self.config['Paths'][key] = value
+
+    def write_settings_string(self, key, value):
+        self.config['Settings'][key] = value
 
     def write_config_bool(self, key, value):
         self.config['Settings'][key] = str(value)
@@ -342,10 +362,12 @@ class ConverterUI:
         self.load_config()
         self.generateDDS = self.read_config_bool("DDS")
         self.generateASTC = self.read_config_bool("ASTC")
+        self.decimatePointcloud = self.read_config_bool("decimatePointcloud")
+        self.decimatePercentage = int(self.read_settings_string("decimatePercentage"))
 
         dpg.create_context()
         dpg.configure_app(manual_callback_management=True)
-        dpg.create_viewport(height=450, width=500, title="Geometry Sequence Converter")
+        dpg.create_viewport(height=480, width=500, title="Geometry Sequence Converter")
         dpg.setup_dearpygui()
 
         with dpg.window(label="Geometry Sequence Converter", tag="main_window", min_size= [500, 500]):
@@ -361,9 +383,15 @@ class ConverterUI:
 
             dpg.add_checkbox(label="Generate textures for desktop devices (DDS)", default_value=self.generateDDS, callback=self.set_DDS_enabled_cb)
             dpg.add_checkbox(label="Generate textures mobile devices (ASTC)", default_value=self.generateASTC, callback=self.set_ASTC_enabled_cb)
-            self.srgb_check_ID = dpg.add_checkbox(label="Convert to SRGB profile", default_value=self.generateASTC, callback=self.set_SRGB_enabled_cb)
+            self.srgb_check_ID = dpg.add_checkbox(label="Convert to SRGB profile", default_value=self.convertToSRGB, callback=self.set_SRGB_enabled_cb)
 
-            dpg.add_spacer(height=30)
+            dpg.add_spacer(height=5)
+
+            self.pointcloud_decimation_ID = dpg.add_checkbox(label="Decimate Pointcloud", default_value=self.decimatePointcloud, callback=self.set_Decimation_enabled_cb)
+            dpg.add_same_line()
+            self.decimation_percentage_ID = dpg.add_input_int(label=" %", default_value=self.decimatePercentage, min_value=0, max_value=100, width=80, callback=self.set_Decimation_percentage_cb)
+
+            #dpg.add_spacer(height=5)
 
             self.text_error_log_ID = dpg.add_text("", color=[255, 0, 0], wrap=450)
             self.text_info_log_ID = dpg.add_text("", color=[255, 255, 255], wrap=450)
@@ -380,7 +408,7 @@ class ConverterUI:
         dpg.show_viewport()
         dpg.set_primary_window("main_window", True)
 
-        self.set_input_files(self.read_config_string("input"))
+        self.set_input_files(self.read_path_string("input"))
 
         while dpg.is_dearpygui_running():
             dpg.render_dearpygui_frame()
