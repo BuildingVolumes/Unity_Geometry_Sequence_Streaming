@@ -162,7 +162,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
             return false;
         }
 
-        GeometrySequencePlayer player = (GeometrySequencePlayer)FindObjectOfType<GeometrySequencePlayer>();
+        GeometrySequencePlayer player = (GeometrySequencePlayer)FindFirstObjectByType<GeometrySequencePlayer>();
         if (player.GetRelativeSequencePath() == null)
         {
             Debug.LogError("Could not finde path in basic sample mesh!");
@@ -189,7 +189,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
         }
 
 
-        PlayableDirector director = (PlayableDirector)FindObjectOfType<PlayableDirector>();
+        PlayableDirector director = (PlayableDirector)FindFirstObjectByType<PlayableDirector>();
         PlayableAsset playable = director.playableAsset;
         TimelineAsset timeline = (TimelineAsset)playable;
         IEnumerable<TimelineClip> clips = timeline.GetRootTrack(1).GetClips();
@@ -232,7 +232,7 @@ public class BumpUpPackageVersionAndCopySamples : EditorWindow
             return false;
         }
 
-        GeometrySequenceAPIExample api = (GeometrySequenceAPIExample)FindObjectOfType<GeometrySequenceAPIExample>();
+        GeometrySequenceAPIExample api = (GeometrySequenceAPIExample)FindFirstObjectByType<GeometrySequenceAPIExample>();
         if (api.sequencePath == null)
         {
             Debug.LogError("Could not find path in API Sample!");
