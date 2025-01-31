@@ -4,14 +4,13 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-    
+        {"name":"Python Debugger: Current File","type":"debugpy","request":"launch","program":"${file}","console":"integratedTerminal"},
         {
-            "name": "Python Debugger: Current File",
+            "name": "Sequence Converter Debug",
             "type": "debugpy",
             "request": "launch",
-            "program": "./Sequence_Converter_UI.py",
-            "console": "integratedTerminal",
-            "subProcess": true
+            "program": "${workspaceFolder}/Sequence_Converter_UI.py",
+            "console": "integratedTerminal"
         }
     ]
 }

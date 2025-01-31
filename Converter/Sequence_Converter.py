@@ -1,18 +1,17 @@
 import os
+import sys
 import subprocess
 import pymeshlab as ml
 import numpy as np
 from threading import Lock
-import threading
 from multiprocessing.pool import ThreadPool
 import Sequence_Metadata
 from PIL import Image
 
 class SequenceConverter:
 
-    isPointcloud = False
     terminateProcessing = False
-
+    debugMode = False
     metaData = Sequence_Metadata.MetaData()
 
     modelPaths = []
@@ -25,6 +24,9 @@ class SequenceConverter:
     outputPath = ""
     resourcePath = ""
 
+    isPointcloud = False
+    hasUVs = False
+    textureDimensions = []
     convertToDDS = False
     convertToASTC = False
     convertToSRGB = False
@@ -35,10 +37,8 @@ class SequenceConverter:
     maxThreads = 8
     loadMeshLock = Lock()
     activeThreads = 0
-    
 
     def start_conversion(self, model_paths_list, image_paths_list, input_path, output_path, resource_Path, processFinishedCB, threadCount, convertDDS, convertASTC, convertSRGB, decimatePointcloud, decimatePercentage):       
-
         self.metaData = Sequence_Metadata.MetaData()
         self.terminateProcessing = False
         self.modelPaths = model_paths_list
@@ -52,6 +52,7 @@ class SequenceConverter:
         self.convertToSRGB = convertSRGB
         self.decimatePointcloud = decimatePointcloud
         self.decimatePercentage = decimatePercentage
+        self.debugMode = False # hasattr(sys, 'gettrace') and sys.gettrace() is not None
 
         modelCount = len(model_paths_list)
         self.metaData.headerSizes = [None] * modelCount
@@ -87,7 +88,7 @@ class SequenceConverter:
                     self.texturePool.close()
                 except:
                     waitOnClose = True
-            self.texturePool.join()
+            self.texturePool.close()
 
         if(writeMetaData):
             self.write_metadata()
@@ -102,15 +103,20 @@ class SequenceConverter:
         else:
             threads = self.maxThreads
 
-        self.modelPool = ThreadPool(processes = threads)
-        self.modelPool.map_async(self.convert_model, self.modelPaths)
+        if not self.debugMode:
+            self.modelPool = ThreadPool(processes = threads)
+            self.modelPool.map_async(self.convert_model, self.modelPaths)
+
+        else:
+            for model in self.modelPaths:
+                self.convert_model(model)
 
     def convert_model(self, file):
 
         listIndex = self.modelPaths.index(file)
 
         if(self.terminateProcessing):
-            self.convert_model_finished(False, "")
+            self.processFinishedCB(False, "")
             return
 
         splitted_file = file.split(".")
@@ -122,41 +128,65 @@ class SequenceConverter:
 
         ms = ml.MeshSet()
 
-        self.loadMeshLock.acquire() # If we don't lock the mesh loading process, crashes might occur
+        if not self.debugMode:
+            self.loadMeshLock.acquire() # If we don't lock the mesh loading process, crashes might occur
 
         try:
             ms.load_new_mesh(inputfile)
         except:
             self.loadMeshLock.release()
-            self.convert_model_finished(True, "Error opening file: " + inputfile)
+            self.processFinishedCB(True, "Error opening file: " + inputfile)
             return    
 
-        self.loadMeshLock.release()
-
         if(self.terminateProcessing):
-            self.convert_model_finished(False, "")
+            self.processFinishedCB(False, "")
+            self.loadMeshLock.release()
             return
 
         faceCount = len(ms.current_mesh().face_matrix())
-        is_pointcloud = True
-        has_UVs = False
 
         #Is the file a mesh or pointcloud?        
         if(faceCount > 0):
-            is_pointcloud = False
+            pointcloud = False
+        else:
+            pointcloud = True
 
         if(ms.current_mesh().has_wedge_tex_coord() == True or ms.current_mesh().has_vertex_tex_coord() == True):
-            has_UVs = True
+            uvs = True
+        else:
+            uvs = False
+
+        if(listIndex == 0):
+            self.isPointcloud = pointcloud
+            self.hasUVs = uvs
+        else:
+            if(self.hasUVs != uvs):
+                # The sequence has different attributes, which is not allowed
+                self.processFinishedCB(True, "Error: Some frames with UVs, some without. All frames need to be consistent with this attribute!")
+                self.loadMeshLock.release()
+                return
+            if(self.isPointcloud != pointcloud):
+                self.processFinishedCB(True, "Error: Some frames are Pointclouds, some are meshes. Mixed sequences are not allowed!")
+                self.loadMeshLock.release()
+                return
 
         #There is a chance that the file might have wedge tex
         #coordinates which are unsupported in Unity, so we convert them
         #Also we need to ensure that our mesh contains only triangles!
-        if(is_pointcloud == False and ms.current_mesh().has_wedge_tex_coord() == True):
-            ms.compute_texcoord_transfer_wedge_to_vertex()           
+        if(self.isPointcloud == False and ms.current_mesh().has_wedge_tex_coord() == True):
+            ms.compute_texcoord_transfer_wedge_to_vertex()     
 
+        # Unity mirrors the X-Axis on import of meshes, so we need to mirror it as well
+        # so that the axis stays consistent
+        ms.apply_matrix_flip_or_swap_axis(flipx = True)
+        
+        # This somehow also flips the faces, so we flip them again
+        if(self.isPointcloud == False):
+            ms.meshing_invert_face_orientation(forceflip = True)            
 
         if(self.terminateProcessing):
-            self.convert_model_finished(False, "")
+            self.processFinishedCB(False, "")
+            self.loadMeshLock.release()
             return
 
         vertices = None
@@ -165,7 +195,7 @@ class SequenceConverter:
         uvs = None
 
         #Load type specific attributes
-        if(is_pointcloud == True):
+        if(self.isPointcloud == True):
             vertices = ms.current_mesh().vertex_matrix().astype(np.float32)
             vertice_colors = ms.current_mesh().vertex_color_array()
         
@@ -173,7 +203,7 @@ class SequenceConverter:
             vertices = ms.current_mesh().vertex_matrix().astype(np.float32)
             faces = ms.current_mesh().face_matrix()
 
-            if(has_UVs == True):     
+            if(self.hasUVs == True):     
                 uvs = ms.current_mesh().vertex_tex_coord_matrix().astype(np.float32)
 
         vertexCount = len(vertices)
@@ -185,18 +215,21 @@ class SequenceConverter:
 
         bounds = ms.current_mesh().bounding_box()
 
-        if(is_pointcloud == True):
+        if(self.isPointcloud == True):
             geoType = Sequence_Metadata.GeometryType.point
         else:
-            if(has_UVs == False):
+            if(self.hasUVs == False):
                 geoType = Sequence_Metadata.GeometryType.mesh
             else:
                 geoType = Sequence_Metadata.GeometryType.texturedMesh
 
         if(self.terminateProcessing):
-            self.convert_model_finished(False, "")
+            self.processFinishedCB(False, "")
+            self.loadMeshLock.release()
             return
 
+        if not self.debugMode:
+            self.loadMeshLock.release()
         
         #The meshlab exporter doesn't support all the features we need, so we export the files manually
         #to PLY with our very stringent structure. This is needed because we want to keep the
@@ -218,14 +251,14 @@ class SequenceConverter:
             header += "property float y" + "\n"
             header += "property float z" + "\n"
 
-            if(is_pointcloud == True):
+            if(self.isPointcloud == True):
                 header += "property uchar red" + "\n"
                 header += "property uchar green" + "\n"
                 header += "property uchar blue" + "\n"
                 header += "property uchar alpha" + "\n"
             
             else:
-                if(has_UVs == True):
+                if(self.hasUVs == True):
                     header += "property float s" + "\n" 
                     header += "property float t" + "\n"
                 header += "element face " + str(len(faces)) + "\n"
@@ -239,7 +272,7 @@ class SequenceConverter:
             f.write(headerASCII)
 
             #Constructing the mesh data, as binary array
-            if(is_pointcloud == True):
+            if(self.isPointcloud == True):
                 
                 verticePositionsBytes = np.frombuffer(vertices.tobytes(), dtype=np.uint8)
                 verticeColorsBytes = np.frombuffer(vertice_colors.tobytes(), dtype=np.uint8)
@@ -267,7 +300,7 @@ class SequenceConverter:
                 #Vertices and UVS
                 verticePositionsBytes = np.frombuffer(vertices.tobytes(), dtype=np.uint8)
 
-                if(has_UVs == True):
+                if(self.hasUVs == True):
                     uvsBytes = np.frombuffer(uvs.tobytes(), dtype=np.uint8)
 
                     verticePositionsBytes = np.reshape(verticePositionsBytes, (-1, 12))
@@ -293,13 +326,12 @@ class SequenceConverter:
 
             f.write(bytes(body))
 
-        self.metaData.set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geoType, has_UVs, listIndex)
+        self.metaData.set_metadata_Model(vertexCount, indiceCount, headerSize, bounds, geoType, self.hasUVs, listIndex)
 
-        self.convert_model_finished(False, "") 
+        self.processFinishedCB(False, "") 
 
-
-    def convert_model_finished(self, error, errorText):
-        self.processFinishedCB(error, errorText)
+        if self.debugMode:
+            print("Processed file: " + str(listIndex))
 
     def process_images(self):
 
@@ -309,6 +341,11 @@ class SequenceConverter:
             threads = self.maxThreads
 
         self.texturePool = ThreadPool(processes= threads)
+
+        #Read the first image to get the dimensions
+        self.convert_image(self.imagePaths[0])
+        self.imagePaths.pop(0)
+
         self.texturePool.map_async(self.convert_image, self.imagePaths)
 
     def convert_image(self, file):
@@ -321,6 +358,8 @@ class SequenceConverter:
 
         splitted_file = file.split(".")
         file_name = splitted_file[0]
+        for x in range(1, len(splitted_file) - 1):
+            file_name += "." + splitted_file[x]
         inputfile = self.inputPath + "\\"+ file
 
         sizeDDS = 0
@@ -328,17 +367,19 @@ class SequenceConverter:
 
         if(self.convertToDDS):
             outputfileDDS =  self.outputPath + "\\" + file_name + ".dds"
-            cmd = self.resourcePath + "texconv " + inputfile + " -o " + self.outputPath + " -m 1 -f DXT1 -y -nologo"
+            cmd = self.resourcePath + "texconv " + "\"" + inputfile + "\"" + " -o " + "\"" + self.outputPath + "\"" +" -m 1 -f DXT1 -y -nologo"
             if(self.convertToSRGB):
                 cmd += " -srgbo" 
             if(subprocess.run(cmd).returncode != 0):
                 self.processFinishedCB(True, "Error converting DDS texture: " + inputfile)
+                return
         
         if(self.convertToASTC):
             outputfileASCT =  self.outputPath + "\\" + file_name + ".astc"
-            cmd = self.resourcePath + "astcenc -cl " + inputfile + " " + outputfileASCT + " 6x6 -medium -silent"
+            cmd = self.resourcePath + "astcenc -cl " + "\"" + inputfile + "\"" + " " + "\"" + outputfileASCT + "\"" + " 6x6 -medium -silent"
             if(subprocess.run(cmd).returncode != 0):
                 self.processFinishedCB(True, "Error converting ASTC texture: " + inputfile)
+                return
 
         # Write the metadata once per sequence
         if(listIndex == 0):
@@ -352,10 +393,17 @@ class SequenceConverter:
             if(len(self.imagePaths) > 1):
                 textureMode = Sequence_Metadata.TextureMode.perFrame
 
+            self.textureDimensions = self.get_image_dimensions(inputfile)
+            self.metaData.set_metadata_texture(self.convertToDDS, self.convertToASTC, self.textureDimensions[0], self.textureDimensions[1], sizeDDS, sizeASTC, textureMode)
+        else:
             dimensions = self.get_image_dimensions(inputfile)
-            self.metaData.set_metadata_texture(self.convertToDDS, self.convertToASTC, dimensions[0], dimensions[1], sizeDDS, sizeASTC, textureMode)
-
-
+            if len(dimensions) < 2:
+                self.processFinishedCB(True, "Could not get image dimensions!")
+                return
+            if(dimensions[0] != self.textureDimensions[0] or dimensions[1] != self.textureDimensions[1]):
+                self.processFinishedCB(True, "All textures need to have the same resolution! Frame " + str(listIndex))
+                return
+        
         self.processFinishedCB(False, "")
 
     def get_image_dimensions(self, filePath):

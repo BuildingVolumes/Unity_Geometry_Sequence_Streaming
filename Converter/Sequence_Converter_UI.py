@@ -28,7 +28,7 @@ class ConverterUI:
     # pyinstaller Sequence_Converter_UI.py --collect-all=pymeshlab --collect-all=numpy --icon=resources/logo.ico -F 
 
     isRunning = False
-    conversionEnded = False
+    conversionFinished = False
     inputPathValid = False
     outputPathValid = False
     processedFileCount = 0
@@ -100,7 +100,6 @@ class ConverterUI:
         if(self.isRunning):
             return
         
-        self.conversionEnded = False
         self.terminationSignal.clear()
 
         self.info_text_clear()
@@ -118,7 +117,9 @@ class ConverterUI:
             if not (os.path.exists(self.proposedOutputPath)):
                 os.mkdir(self.proposedOutputPath)
 
-        self.totalFileCount =  len(self.modelPathList) + len(self.imagePathList)
+        self.totalFileCount =  len(self.modelPathList) 
+        if(self.generateASTC or self.generateDDS):
+            self.totalFileCount += len(self.imagePathList)
         self.processedFileCount = 0
         self.converter.start_conversion(self.modelPathList, self.imagePathList, self.inputSequencePath, self.get_output_path(), self.resourcesPath, self.single_conversion_finished_cb, dpg.get_value(self.thread_count_ID), self.generateDDS, self.generateASTC, self.convertToSRGB, self.decimatePointcloud, self.decimatePercentage)
 
@@ -298,37 +299,38 @@ class ConverterUI:
     def advance_progressbar(self, error, errorText):
 
         self.progressbarLock.acquire()
+        self.processedFileCount += 1
 
         if(error):
             self.error_text_set(errorText)
             self.cancel_processing_cb()
-
-        self.processedFileCount += 1
-
-        if(self.terminationSignal.is_set() == False):
-            self.set_progressbar(self.processedFileCount / self.totalFileCount)
-            self.info_text_set("Converting: " + str(self.processedFileCount) + " / " + str(self.totalFileCount))
+            self.set_progressbar(1)
+            self.info_text_set("Error occurred during conversion: ")
 
         else:
-            self.set_progressbar(1)
-            self.info_text_set("Canceling...")
+            if(self.terminationSignal.is_set() == False):
+                self.set_progressbar(self.processedFileCount / self.totalFileCount)
+                self.info_text_set("Converting: " + str(self.processedFileCount) + " / " + str(self.totalFileCount))
+
+            else:
+                self.set_progressbar(0)
+                self.info_text_set("Cancelling")
 
         if(self.processedFileCount == self.totalFileCount):
-            self.conversionEnded = True
+            self.conversionFinished = True
 
         self.progressbarLock.release()
 
-    def finish_conversion(self):     
+    def finish_conversion(self):             
+        self.converter.finish_conversion(not self.terminationSignal.is_set())
 
         if(self.terminationSignal.is_set()):
             self.info_text_set("Canceled!")
         else:
             self.info_text_set("Finished!")
-        
-        self.converter.finish_conversion(not self.terminationSignal.is_set())
         self.set_progressbar(0)
+        
         self.isRunning = False
-        self.conversionEnded = False
 
     def set_progressbar(self, progress):
         dpg.set_value(self.progress_bar_ID, progress)
@@ -391,8 +393,6 @@ class ConverterUI:
             dpg.add_same_line()
             self.decimation_percentage_ID = dpg.add_input_int(label=" %", default_value=self.decimatePercentage, min_value=0, max_value=100, width=80, callback=self.set_Decimation_percentage_cb)
 
-            #dpg.add_spacer(height=5)
-
             self.text_error_log_ID = dpg.add_text("", color=[255, 0, 0], wrap=450)
             self.text_info_log_ID = dpg.add_text("", color=[255, 255, 255], wrap=450)
 
@@ -415,12 +415,12 @@ class ConverterUI:
             jobs = dpg.get_callback_queue()
             dpg.run_callbacks(jobs)
 
-            if(self.conversionEnded):
+            if(self.conversionFinished):
                 self.finish_conversion()
+                self.conversionFinished = False
 
         # Shutdown threads when they are still running
         self.cancel_processing_cb()
-        self.converter.finish_conversion(False)
         self.save_config()
         dpg.destroy_context()
 
