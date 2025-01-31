@@ -13,12 +13,13 @@ weight: 120
 toc: true
 ---
 
-> 💡If you want to playback data captured with LiveScan3D, you can skip this step, as it's already in the right format.
-
 ## Intro
 
-To gurantee high realtime performance, the Geometry Sequence Streamer can only read sequences that are in special file format (.ply for models, .dds for textures). However, to support a broad spectrum of input formats and make the usage of this plugin as easy as possible, we provide a small converter tool which takes in almost all widely used mesh and image formats, and converts them into the correct format for the plugin.
+To gurantee high realtime performance, the Geometry Sequence Streamer can only read sequences that are in special file format (.ply for models, .dds/.astc for textures). However, to support a broad spectrum of input formats and make the usage of this plugin as easy as possible, we provide a small converter tool which takes in almost all widely used mesh and image formats, and converts them into the correct format for the plugin.
+
 > 👉🏻 Even when your files are already in the .ply/.dds format, they might need to be run through the converter to be encoded correctly!
+>
+> ⤴️ Sequences that were created before package version 1.1.0 are not compatible with the current package. Please re-convert these files with the latest Converter
 
 ## Preparation for the conversion
 
@@ -57,7 +58,7 @@ These are all supported file formats for pointclouds/meshes:
 And for images:
 
 ```txt
-.dds .gif .jpg .png .psd .tga
+.jpg .png .tga
 ```
 
 ## Converting your sequences
@@ -70,21 +71,24 @@ And for images:
 
 ### Using the converter
 
-1. Click on ***Select Input Directory*** ![Converter Select Input](Converter_SelectInput.png)
+1. Click on ***Select Input Directory*** and select the folder containing the files. ![Converter Select Input](Converter_SelectInput.png)
 
-2. If you don't see any file structure, you may need to click on ***Drives*** ![Converter Select Drive](Converter_SelectDrive.png)
+2. You can now optionally choose an output directory. If you don't choose one, a folder named *converted* will be created inside your sequence directory. ![Converter Select Drive](Converter_SelectOutput.png)
 
-3. Select/Go into the folder which contains your sequence and hit ***Ok*** ![Converter Select Drive](Converter_SelectFolder.png)
+3. The converter provides some settings which can be used to modify the sequence: ![Converter Select Input](Converter_Options.png)
 
-4. Now choose your output directory. It has to be a different, empty folder! For convinience, you can click ***Set to Input directory*** to copy the input folder path, and then use ***Select Output Directory*** to choose the empty output folder ![Converter Select Drive](Converter_SelectOutput.png)
+    - **Generate textures for desktop devices (DDS):** This converts the textures into a format for desktop GPUs. Recommended to leave on, even when you only build for mobile devices, otherwise textures won't show up in the Unity editor.
+    - **Generate textures for mobile devices (ASTC):** If you plan to distribute your application on mobile devices (Android, IPhone, Meta Quest, Apple Vision Pro) and use textured meshes, you need to also generate .astc textures. You only need to transfer the .astc textures to your device, but not the .dds textures.
+    - **Convert to SRGB profile:** Activate when your textures look noticably darker / brighter after the conversion
+    - **Decimate Pointcloud:** You can downsize your pointcloud sequence with this option. The value determines the percentage of points left after conversion. E.g. setting the value to 30% will decrease the points of the sequence by 70%.
 
-5. When you've set your input/output folders, click on ***Start Conversion***. You can optionally choose the amount of threads used for the conversion, which might come in handy for heavy/large sequences. ![Converter Select Drive](Converter_Start_Threads.png)
+4. When you've set your input/output folders, click on ***Start Conversion***. You can optionally choose the amount of threads used for the conversion, which might come in handy for heavy/large sequences. ![Converter Select Drive](Converter_Start_Threads.png)
 
-6. The converter will now process your files and show a progress bar. If you want to cancel the process, click on ***Cancel***. Cancelling might take a bit of time. When the process is done, you'll have the converted sequence inside of the output folder, which you can now move to another location. The files in the output folder will be used to stream the sequence inside of Unity.
+5. The converter will now process your files and show a progress bar. If you want to cancel the process, click on ***Cancel***. Cancelling might take a bit of time. When the process is done, you'll have the converted sequence inside of the output folder.
 
 ## For developers: Format specification
 
-If you want to export your data into the correct format directly, without using the converter, you can do so! The format used here is not proprietory, but uses the open [*Stanford Polygon File Format* (.ply)](http://paulbourke.net/dataformats/ply/ ) for meshes and pointclouds and the [*DirectDraw Surface* (.dds)*](https://en.wikipedia.org/wiki/DirectDraw_Surface) file format for textures/images. However, both formats allow a large variety of encoding, and the Geometry Sequence Streamer needs to be supplemented a special encoding. The following sections assume that you are a bit familiar with both formats.
+If you want to export your data into the correct format directly, without using the converter, you can do so! The format used here is not proprietory, but uses the open [*Stanford Polygon File Format* (.ply)](http://paulbourke.net/dataformats/ply/ ) for meshes and pointclouds and the [*DirectDraw Surface* (.dds)*](https://en.wikipedia.org/wiki/DirectDraw_Surface), as well as [*Adaptive Scalable texture compression*](https://en.wikipedia.org/wiki/Adaptive_scalable_texture_compression) file format for textures/images. However, all formats allow a large variety of encoding settings, and the Geometry Sequence Streamer expects a special encoding. Additionally, the Streamer needs to be supplied with a ***sequence.json*** file, which contains metadata about the sequence. The following sections assume that you are a bit familiar with all formats.
 
 ### Pointcloud .ply files
 
@@ -146,4 +150,32 @@ The data for a single indice (line) in the index list could look like this:
 
 ### Textures/Images
 
-The textures should be encoded in the .dds format with **BC1/DXT1** encoding and **no mip-maps**.
+The textures should be encoded with **BC1/DXT1** encoding and **no mip-maps** for the *.dds format* and the **6x6 blocks** and **linear LDR color profile** for .astc textures. Please ensure that the resolution and encoding stays consistent for all textures in one sequence.
+
+### Sequence.json
+
+The sequence.json file contains information about your sequence in the following format and should be saved in the sequence folder:
+
+```JSON
+
+//This is an example sequence.json for a textured mesh sequence with
+//three frames
+
+{
+  "geometryType": 2, //0 = Pointcloud, 1 = Mesh, 2 = Textured Mesh
+  "textureMode": 2, //0 = No Textures, 1 = One texture, 2 = Per Frame textures
+  "DDS": true, //Does this sequence have .dds textures?
+  "ASTC": false, //Does this sequence have .astc textures?
+  "hasUVs": true, //If using a mesh, does it have UVs?
+  "maxVertexCount": 26545, //The vertice count of the mesh/pointcloud with the highest vertice count in the whole sequence
+  "maxIndiceCount": 55423, //The indice count of the mesh/pointcloud with the highest indice count in the whole sequence
+  "maxBounds": [325.8575134277344, 295.0, 2103.5478515625, -18.240554809570312, -238.74757385253906, 0], //Bounds of the mesh in the format: MaxboundX, MaxboundY, MaxboundZ, MinboundX, MinboundY, MinboundZ
+  "textureWidth": 512, //The width of the texture(s)
+  "textureHeight": 512, //The hight of the texture(s)
+  "textureSizeDDS": 2097152, //The size of a single .dds texture in bytes
+  "textureSizeASTC": 0, //The size of a single .astc texture in bytes
+  "headerSizes": [260, 260, 260], //The size of the .ply header in bytes, for each frame
+  "verticeCounts": [25434, 26545, 24554], //The vertice counts of each frame
+  "indiceCounts": [55423, 54543, 45443] //The indice counts of each frame
+  }
+```

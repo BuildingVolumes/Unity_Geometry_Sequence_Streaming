@@ -13,13 +13,14 @@ weight: 430
 toc: true
 ---
 
-The Unity package, the Converter tool, the example data and this website is licensed under the ***MIT License.***
+The open source Unity package, the Converter tool, the example data and this website is licensed under the ***MIT License.***
 **If you use this package in your project, we'd be grateful if you would credit us in your project**
+
+The Unity Asset Store version of the package is licensed under the [Unity Standard Asset Store license](https://unity.com/legal/as-terms)
 
 ## MIT License
 
-Copyright 2023 [Christopher Remde](chrisrem.de/) @ [Charité Experimental Surgery](https://www.experimental-surgery.de/) & [Hunter Dyar](https://hdyar.com/)
-
+Copyright 2025 [Christopher Remde](chrisrem.de/)
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.

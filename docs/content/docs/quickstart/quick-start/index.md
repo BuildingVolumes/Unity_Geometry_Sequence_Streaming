@@ -15,22 +15,34 @@ toc: true
 
 ## Install the package
 
-1. Open your Unity project, and in the **toolbar**, go to **Windows –> Package Manager.**
+> ⭐ For installation of the Unity Store Version, see section below
 
-2. In the **Package Manager window**, go into the upper left corner and click on the **"+" Button –> Add package from Git URL.**
+1. Open your Unity project, and in the **toolbar** go to **Windows –> Package Manager**.
+
+2. In the **Package Manager window**, go into the upper left corner and click on the **"+" Button –> Add package from Git URL**.
 
 3. Copy and paste the following URL into the field and click **Add**: `https://github.com/BuildingVolumes/Geometry_Sequence_Streaming_Package.git`
 
-4. To install the samples, select the Geometry Streaming Sequence package and open the **Sample foldout**. Then click on **Import**.
+[More info](/docs/tutorials/unity-package-installation/)
 
-[More info](/Unity_Geometry_Sequence_Streaming/docs/tutorials/unity-package-installation/)
+## Install the package (Unity Store Version)
+
+1. Open your Unity project, and in the **toolbar** go to **Windows –> Package Manager**.
+
+2. In the **Package Manager window**, go to **My Assets** and select the **Geometry Sequence Streaming** package.
+
+3. Click on the **Install** Button.
+
+[More info](/docs/tutorials/unity-package-installation/)
 
 ## Play your first sequence
 
-1. In your assets folder, go into the samples folder(s) and open the Sample scene *01_Basic_Example*
+1. Install the samples into your project by going into **Package Manager –> In Project**. Select the **Geometry Streaming Sequence package** and open the **Sample foldout**. Then click on **Import**.
 
-2. Click on the **"Play"-Button** in Unity. You should now see a box with a twisting animation. This uses a sequence also found in the sample folder
+2. In your assets folder, go into `Samples -> Geometry Sequence Streaming -> 1.X.X -> Streaming Samples`  and open the Sample scene ***01_Basic_Example***
 
-![A spinning box](https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNDMwZTkyOTEzZjRiM2M5ZWI4ZTc1NmEyNjIzZjg2OTU4MzRlZGQ0NCZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/cxJpQmE5QeReOgx16L/giphy.gif)
+3. Click on the **"Play"-Button** in Unity. You should now see an animated blob.
 
-[More info](/Unity_Geometry_Sequence_Streaming/docs/tutorials/basic-playback/)
+[More info](/docs/tutorials/basic-playback/)
+
+![Blob](https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExYmVvbXVpazdyanR0dmxyNDhjazNkM3owcnV3NHlwMWFseDRpemoyeiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/XuN1lmgwobrU8eWgsb/giphy.gif)

@@ -17,7 +17,7 @@ toc: true
 
 ## Intro
 
-Beside playback from timeline and in the editor, this package also allows you to control playback from your own scripts. This is useful, if you have for example playback control by the user via UI buttons, or you want interactivly integrate playback inside your application.
+Besides playback from the timeline and the editor controls, this package also features a API, so that you can control playback from your own scripts. This is for example useful, if you want to let the user control playback via UI buttons, or you want to interactively integrate the player into your experience!
 
 ## Setup
 
@@ -60,7 +60,7 @@ void Start()
 You can the load your sequence with the **OpenSequence()** function at any point:
 
 ```C#
-//Load our sequence, set its framerate to 30 and play it directly after loading
+//Load our sequence from an absolute path, set its framerate to 30 and play it directly after loading
 player.OpenSequence("C:\MySequences\MyOwnSequence\", GeometrySequencePlayer.PathType.AbsolutePath, 30, true);
 ```
 
@@ -80,8 +80,8 @@ public void PlaybackEventListener(GeometrySequencePlayer player, GeometrySequenc
             case GeometrySequencePlayer.GSPlayerEvents.PlaybackFinished:
                 print("Playback Finished!");
                 break;
-            case GeometrySequencePlayer.GSPlayerEvents.PlaybackStarted:
-                print("Playback Started!");
+            case GeometrySequencePlayer.GSPlayerEvents.SequenceChanged:
+                print("Sequence has been changed!");
                 break;
         }
     }
@@ -89,17 +89,13 @@ public void PlaybackEventListener(GeometrySequencePlayer player, GeometrySequenc
 
 To actually receive the events, you need to subscribe to them. You can either do this by adding a reference to your function inside the GeometrySequencePlayer **in the editor**, or subscribing to a Players events **inside your script (recommended)**.
 
-&nbsp;
-
 **Subscribe via Editor:**
 To subscribe to events via the Editor, go to your GeometrySequencePlayer into the events foldout, click on **+** and drag and drop your script into the event subscription box. Now, select your function.
 
 ![Adding event subscription inside the editor](editor_playback_add_event.png)
 
-&nbsp;
-
 **Subscribe via Code:**
-To subscribe to an event via code, get a reference to the player you want to subscribe to, and then add a Listener to the event. Dont forget to unsubscribe when the script gets destroyed/disabled!
+To subscribe to an event via code, get a reference to the player you want to subscribe to, and then add a Listener to the event. Don't forget to unsubscribe when the script gets destroyed/disabled!
 
 ```C#
 
@@ -141,7 +137,7 @@ Parameters:
 
 Returns:
 
-- **True** when sequence could successfully be loaded, **false** when an error has occured while loading. Take a look in the Unity console in this case
+- **True** when sequence could successfully be loaded, **false** when an error has occurred while loading. Take a look in the Unity console in this case
 
 ### LoadCurrentSequence()
 
@@ -153,7 +149,7 @@ Returns:
 
 Returns:
 
-- **True** when sequence could successfully be loaded, **false** when an error has occured while loading. Take a look in the Unity console in this case
+- **True** when sequence could successfully be loaded, **false** when an error has occurred while loading. Take a look in the Unity console in this case
 
 ### SetPath()
 
@@ -217,7 +213,7 @@ Parameters:
 
 Returns:
 
-- `True` when skipping was successfull `False` if there has been an error, or the desired frame index was out of range
+- `True` when skipping was successful `False` if there has been an error, or the desired frame index was out of range
 
 ### GoToTime()
 
@@ -259,11 +255,20 @@ Returns:
 ### GetRelativeTo()
 
 `GeometrySequenceStream.PathType GetRelativeTo()`
-Get the location to to which the relativePath is relative to. Use [Application.datapath](https://docs.unity3d.com/ScriptReference/Application-dataPath.html), [Application.persistentDataPath](https://docs.unity3d.com/ScriptReference/Application-persistentDataPath.html) or [Application.streamingAssetsPath](https://docs.unity3d.com/Manual/StreamingAssets.html) to get the actual path string, depeding on the return type.
+Get the location to to which the relativePath is relative to. Use [Application.datapath](https://docs.unity3d.com/ScriptReference/Application-dataPath.html), [Application.persistentDataPath](https://docs.unity3d.com/ScriptReference/Application-persistentDataPath.html) or [Application.streamingAssetsPath](https://docs.unity3d.com/Manual/StreamingAssets.html) to get the actual path string, depending on the return type.
 
 Returns
 
 - The relative location
+
+### IsInitialized()
+
+`bool IsInitialized()`
+Is a sequence currently loaded and ready to play?
+
+Returns:
+
+- `True` if a sequence is initialized and ready to play, `False` if not
 
 ### IsPlaying()
 
@@ -324,7 +329,7 @@ Returns:
 ### GetTargetFPS()
 
 `float GetTargetFPS()`
-The target fps is the framerate we _want_ to achieve in playback. However, this is not guranteed, if system resources
+The target fps is the framerate we _want_ to achieve in playback. However, this is not guaranteed, if system resources
 are too low. Use GetActualFPS() to see if you actually achieve this framerate
 
 Returns:
@@ -344,15 +349,15 @@ Returns:
 ### GetFrameDropped()
 
 `bool GetFrameDropped()`
-Check if there have been framedrops since you last checked this function. You should pull this data every frame.
-Too many framedrops mean the system can't keep up with the playback
+Check if there have been frame drops since you last checked this function. You should pull this data every frame.
+Too many frame drops mean the system can't keep up with the playback
 and you should reduce your Geometric complexity or framerate.
 
 Returns:
 
-- `True` When there has been a frame dropped since the last time you checked it, `False` if there has been no framedrop
+- `True` When there has been a frame dropped since the last time you checked it, `False` if there has been no frame drop
 
 ### GetCacheFilled()
 
 `bool GetCacheFilled()`
-Checks if the playback cache has been filled and is ready to play.
+Checks if the playback cache has been filled and is ready to play. If it is, playback starts immediately once you call Play()

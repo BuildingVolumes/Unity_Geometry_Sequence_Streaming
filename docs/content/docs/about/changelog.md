@@ -13,6 +13,26 @@ weight: 420
 toc: true
 ---
 
+### Version 1.1.0
+
+Added features:
+
+- Huge overhaul of the playback system. Performance is enhanced by up to 10x-20x.
+- Pointcloud geometry shaders have been replaced by a compute shader system
+- Mac, Iphone, Ipad and VisionOS (Assets store version only) platforms are now supported
+- Compressed .astc textures for mobile devices are now supported
+- Converter Tool supports reduction of pointcloud sizes
+- More reliable playback. Lags, or low framerates don't affect the playback speed anymore
+- Added frame debugging/performance tools
+- URP and HDRP render pipelines are now supported
+- Unity 6000 is now supported
+
+Fixed Issues:
+
+[#7 "visionOS Support"](https://github.com/BuildingVolumes/Unity_Geometry_Sequence_Streaming/issues/7)
+
+[#5 "Pointcloud shader not working on Metal/OpenGL](https://github.com/BuildingVolumes/Unity_Geometry_Sequence_Streaming/issues/5)
+
 ### Version 1.0.3
 
 Added features:
