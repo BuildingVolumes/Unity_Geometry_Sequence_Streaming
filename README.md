@@ -1,4 +1,4 @@
-![Unity_Package_Logo](https://github.com/Elite-Volumetric-Capture-Sqad/Unity_Geometry_Sequence_Streaming/assets/39704202/5e929f89-fd07-4f5c-8bb1-87581dcd8a09)
+![gss_logo](https://github.com/user-attachments/assets/5a97085f-e010-49f0-99d5-1db37ca2a897)
 
 ---
 
